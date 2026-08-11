@@ -1,110 +1,95 @@
 /* ============================================================
-   SalonVine — Live Data backend v4.1 (Google Apps Script)
+   SalonVine — Live Data backend v4 (Google Apps Script)
 
-   v4 adds the mail/SMS relay for the multi-tenant app site
-   (salonvine-app.netlify.app), plus plan/status lookups so the
-   app can enforce seat limits and (later) suspend/reactivate
-   salons. EVERY v1/v2/v3 handler keeps working unchanged.
+   v4 = v3 + full owner edit/delete for the owner portal.
+   EVERY v1/v2/v3 handler keeps working unchanged.
 
-   ------------------------------------------------------------
-   ENDPOINT REFERENCE (all of them, v1 -> v4)
-   ------------------------------------------------------------
-   doGet:
-     ?site=<slug>            PUBLIC, no token. Safe site config
-                             only ({slug,name,tagline,theme,
-                             accent,photos,services,hours,
-                             instagram}) and only for salons with
-                             status 'live-free' / 'live'. Never
-                             includes email/phone/plan/status.
-     ?token=<SV_TOKEN>       Full data read: {signups, months,
-                             salons, siteLeads}.
+   New in v4 (ALL full-token only, all audited to _AuditLog):
+     - {type:'salonDelete', ref}
+                   ref matches the salonId column OR the slug
+                   column (wizard rows key on slug, the two older
+                   rows — studio17 / demo-iron-oak — key on
+                   salonId). Refuses on 0 or >1 matches. Deletes
+                   the Salons sheet row. Returns
+                   {ok, deleted:{salonId,slug,name}}.
+     - {type:'salonEdit', ref, fields:{...}}
+                   Same ref resolution. Updates only provided
+                   whitelisted columns (name/tagline/theme/accent/
+                   status/plan/url; theme validated against the 6
+                   known themes) plus fields.hours / .instagram /
+                   .services which merge into the config JSON blob
+                   with the same sanitizers as salonConfig.
+                   Returns {ok, salon:{...updated record...}}.
+     - {type:'signupDelete', id}
+                   Deletes the Signups row by id.
+                   Returns {ok, deleted:{id,salon}}.
+     - {type:'leadDelete', ts, slug}
+                   Deletes the SiteLeads row where
+                   String(ts)===String(row.ts) && slug matches
+                   (SiteLeads has no id column; the ISO ts is
+                   unique enough). Refuses on 0 or >1 matches.
+     - {type:'revenueSet', ym, fields:{revenue?,studio?,pro?,
+                   elite?,trials?,conversions?,churn?}}
+                   Upserts the Revenue row keyed by ym
+                   (YYYY-MM validated, numeric coercion).
+     - {type:'revenueDelete', ym}
+     - _AuditLog tab: every v4 handler appends
+                   [ts, actor, type, ref, fields-json(<=500ch)].
+                   Audit failure NEVER breaks the action.
 
-   doPost (body = text/plain JSON, avoids CORS preflight):
-     Light token (SV_SIGNUP_TOKEN) or full token (SV_TOKEN):
-       {type:'signup'}       v1. Lead row in Signups + owner
-                             notify email. 10-min email de-dupe.
-                             Returns {ok,id,deduped?}.
-       {type:'signupSite'}   v2/v3. Everything 'signup' does PLUS
-                             creates a live Salons row (unique
-                             slug, theme/accent/tagline, and v3
-                             extras services/hours/instagram in
-                             the config blob). 24h retry guard by
-                             email. Returns {ok,id,slug,url}.
-       {type:'sitePhoto'}    v2. {slug,n,data:base64 dataURL} ->
-                             Drive "SalonVine Sites/<slug>/",
-                             shared link appended to photos.
-                             Cap 8/salon. Returns {ok,url,count}.
-       {type:'siteLead'}     v2. {slug,name,phone,email,message}
-                             -> SiteLeads row + email to salon
-                             owner and SalonVine owners. 5-min
-                             de-dupe. Returns {ok}.
-       {type:'findSite'}     v3. {email} -> newest LIVE site for
-                             that signup email. Only reveals
-                             {slug,url,salonName}.
-     Full token (SV_TOKEN) ONLY:
-       {type:'signupStatus'} v1. {id,status:new/contacted/
-                             converted/lost}. Returns {ok}.
-       {type:'salon'}        v1. Header-driven upsert of a Salons
-                             row by salonId. Returns {ok}.
-       {type:'salonConfig'}  v3. {slug,patch:{...}} shallow-merge
-                             into the salon's config JSON blob
-                             (services/hours/instagram sanitized,
-                             signupId protected, null deletes).
-                             Returns {ok,slug,config}.
-       {type:'sendMail'}     v4. Mail/SMS relay for the app site.
-                             {to,subject,text} sends an email as
-                             the executing account; {sms:{phone},
-                             text} sends the text to the 4 US
-                             carrier email-to-text gateways
-                             (vtext.com, tmomail.net, txt.att.net,
-                             messaging.sprintpcs.com) with a blank
-                             subject. Both may be combined in one
-                             call. Every send is logged to the
-                             MailLog tab. Returns {ok,sent} or
-                             {error}.
-       {type:'salonPlan'}    v4. {slug} -> {ok,slug,plan,status}
-                             from the Salons sheet. Used by the
-                             app site to enforce per-plan seat
-                             limits (studio 3 / pro 10 / elite
-                             unlimited).
-       {type:'salonStatus'}  v4. {slug,status} -> updates the
-                             salon row's status cell (future
-                             suspend/reactivate) and appends to
-                             the StatusLog tab (ts,slug,old,new).
-                             Returns {ok,slug,old,new}.
+   setup() stays migration-safe (now also adds the _AuditLog tab
+   if missing). doGet is unchanged. Nothing was removed.
 
    ------------------------------------------------------------
-   *** ROTATION NOTE — SV_SIGNUP_TOKEN (do this with v4) ***
-   ------------------------------------------------------------
-   The old SV_SIGNUP_TOKEN was exposed in the public page source
-   of the marketing site, so anyone could read it and spam the
-   light-token endpoints. It MUST be rotated when v4 ships, and
-   the marketing site must stop shipping it to the browser (the
-   new app site keeps it server-side only, in the signup-proxy
-   Netlify function). Steps:
-     1. Apps Script editor -> Project Settings -> Script
-        Properties -> edit SV_SIGNUP_TOKEN -> paste a NEW long
-        random value -> Save. (Old token dies instantly; no
-        redeploy of the web app is needed for property changes.)
-     2. Netlify site "salonvine-app" -> Site configuration ->
-        Environment variables -> update SV_SIGNUP_TOKEN to the
-        same new value -> redeploy functions.
-     3. Confirm no client-side file (marketing site or app site)
-        contains the new value — it may only ever live in Script
-        Properties and Netlify env vars.
+   v3 added services / hours / Instagram to instant sites, the
+   SiteLeads feed for the owner portal, and a full-token config
+   patch handler. EVERY v1/v2 handler keeps working unchanged:
+     - {type:'signup'}        signup token OR full token
+     - {type:'signupStatus'}  full token only
+     - {type:'salon'}         full token only
+     - doGet?token=SV_TOKEN   full data read
 
-   ------------------------------------------------------------
+   New in v3:
+     - {type:'signupSite'}    now also accepts services:[{name,price}],
+                              hours (short text) and instagram (handle) —
+                              stored inside the Salons.config JSON blob.
+     - doGet?site=<slug>      public payload now also includes
+                              services / hours / instagram (still no
+                              email, phone, plan or status).
+     - doGet?token=SV_TOKEN   response gains siteLeads: [...] (the
+                              SiteLeads tab) for the portal Bookings view.
+     - {type:'salonConfig'}   FULL token only. {slug, patch:{...}} —
+                              shallow-merges whitelisted-sanitized keys
+                              into that salon's config JSON (owner-portal
+                              editing, future site editor).
+
+   From v2 (unchanged):
+     - {type:'signupSite'}    signup token ok — signup row + owner
+                              email + creates a live Salons row with
+                              a unique slug. Returns {ok,id,slug,url}.
+     - {type:'sitePhoto'}     signup token ok — saves a base64 JPEG
+                              to Drive "SalonVine Sites/<slug>/",
+                              shares anyone-with-link, appends the
+                              lh3.googleusercontent URL to the
+                              salon's photos JSON. Cap 8/salon.
+     - {type:'siteLead'}      signup token ok — booking request from
+                              a live salon site. Stored in SiteLeads
+                              tab + emailed to the salon owner AND
+                              the SalonVine owners.
+     - doGet?site=<slug>      NO token — public site config only
+                              ({slug,name,tagline,theme,accent,photos})
+                              for status 'live-free'/'live' salons.
+
    Install/upgrade: open the "SalonVine — Live Data" Sheet ->
    Extensions -> Apps Script -> replace the file with this one ->
    run setup() once (migration-safe: appends missing headers /
-   missing tabs incl. the new MailLog + StatusLog, never wipes)
-   -> Deploy -> Manage deployments -> edit the EXISTING web-app
-   deployment -> New version. The /exec URL stays the same.
+   missing tabs, never wipes) -> Deploy -> Manage deployments ->
+   edit the EXISTING web-app deployment -> New version. The /exec
+   URL stays the same.
 
-   Script Properties:
+   Script Properties (unchanged):
      SV_TOKEN        — full read/write token
-     SV_SIGNUP_TOKEN — light token, server-side only (see
-                       ROTATION NOTE above)
+     SV_SIGNUP_TOKEN — light public token for the marketing site
    ============================================================ */
 
 /* ---------- Owner notification list ---------- */
@@ -116,22 +101,12 @@ var MAX_PHOTOS_PER_SALON = 8;
 /* ~6MB of binary is ~8.4M base64 chars (incl. dataURL header slack) */
 var MAX_PHOTO_POST_CHARS = 8600000;
 
-/* v4 mail relay limits */
-var MAX_MAIL_TEXT_CHARS = 10000;
-var MAX_SMS_TEXT_CHARS = 300;
-var MAX_MAIL_SUBJECT_CHARS = 200;
-var SMS_GATEWAYS = ['vtext.com', 'tmomail.net', 'txt.att.net', 'messaging.sprintpcs.com'];
-
-/* v4 salonStatus whitelist */
-var VALID_SALON_STATUSES = ['live', 'live-free', 'pending', 'suspended', 'cancelled'];
-
 var TABS = {
   SIGNUPS: 'Signups',
   REVENUE: 'Revenue',
   SALONS: 'Salons',
   SITELEADS: 'SiteLeads',
-  MAILLOG: 'MailLog',
-  STATUSLOG: 'StatusLog'
+  AUDIT: '_AuditLog'          /* v4 */
 };
 
 var HEADERS = {
@@ -141,10 +116,19 @@ var HEADERS = {
      live sheets migrate by adding columns on the right. */
   Salons:  ['salonId', 'name', 'url', 'plan', 'status', 'slug', 'theme', 'accent', 'tagline', 'photos', 'config', 'createdAt'],
   SiteLeads: ['ts', 'slug', 'name', 'phone', 'email', 'message'],
-  /* v4 */
-  MailLog: ['ts', 'to', 'kind', 'subject', 'ok'],
-  StatusLog: ['ts', 'slug', 'old', 'new']
+  /* v4: audit trail — setup() creates it via the same
+     migration-safe loop (adds the tab if missing, never wipes). */
+  '_AuditLog': ['ts', 'actor', 'type', 'ref', 'fields']
 };
+
+/* v4: the 6 known site themes (mirror of the wizard/renderer) */
+var THEMES = ['classic-cream', 'midnight', 'rose-gold', 'sage-spa', 'bold-noir', 'ocean'];
+
+/* v4: whitelisted Salons columns the portal may edit directly */
+var SALON_EDIT_COLS = ['name', 'tagline', 'theme', 'accent', 'status', 'plan', 'url'];
+
+/* v4: whitelisted Revenue fields */
+var REV_FIELDS = ['revenue', 'studio', 'pro', 'elite', 'trials', 'conversions', 'churn'];
 
 /* ============================================================
    Setup — run once. Migration-safe:
@@ -199,22 +183,6 @@ function jsonOut_(obj) {
 function sheet_(name) {
   var sh = SpreadsheetApp.getActiveSpreadsheet().getSheetByName(name);
   if (!sh) { throw new Error('Missing tab: ' + name + ' — run setup()'); }
-  return sh;
-}
-
-/* v4: like sheet_() but self-heals — creates the tab with its
-   headers if it's missing, so sendMail/salonStatus keep working
-   even if setup() wasn't re-run after upgrading to v4. */
-function sheetOrCreate_(name) {
-  var ss = SpreadsheetApp.getActiveSpreadsheet();
-  var sh = ss.getSheetByName(name);
-  if (sh) { return sh; }
-  sh = ss.insertSheet(name);
-  var want = HEADERS[name] || [];
-  if (want.length) {
-    sh.getRange(1, 1, 1, want.length).setValues([want]);
-    sh.setFrozenRows(1);
-  }
   return sh;
 }
 
@@ -419,13 +387,8 @@ function publicSiteConfig_(slugRaw) {
      {type:'signupSite'}   signup token or full token   (v2)
      {type:'sitePhoto'}    signup token or full token   (v2)
      {type:'siteLead'}     signup token or full token   (v2)
-     {type:'findSite'}     signup token or full token   (v3)
      {type:'signupStatus'} full token only              (v1)
      {type:'salon'}        full token only              (v1)
-     {type:'salonConfig'}  full token only              (v3)
-     {type:'sendMail'}     full token only              (v4)
-     {type:'salonPlan'}    full token only              (v4)
-     {type:'salonStatus'}  full token only              (v4)
    Body arrives as text/plain JSON (avoids CORS preflight).
    ============================================================ */
 function doPost(e) {
@@ -461,177 +424,360 @@ function doPost(e) {
   if (!isFullToken_(token)) {
     return jsonOut_({ error: 'Unauthorized' });
   }
-  try {
-    if (type === 'signupStatus') { return handleSignupStatus_(body); }
-    if (type === 'salon') { return handleSalonUpsert_(body); }
-    if (type === 'salonConfig') { return handleSalonConfig_(body); }
-    /* v4 */
-    if (type === 'sendMail') { return handleSendMail_(body); }
-    if (type === 'salonPlan') { return handleSalonPlan_(body); }
-    if (type === 'salonStatus') { return handleSalonStatus_(body); }
-  } catch (err3) {
-    return jsonOut_({ error: 'Server error: ' + (err3 && err3.message ? err3.message : err3) });
+  if (type === 'signupStatus') { return handleSignupStatus_(body); }
+  if (type === 'salon') { return handleSalonUpsert_(body); }
+  if (type === 'salonConfig') { return handleSalonConfig_(body); }
+
+  /* ---- v4 owner edit/delete handlers (full token only) ---- */
+  if (type === 'salonDelete' || type === 'salonEdit' || type === 'signupDelete' ||
+      type === 'leadDelete' || type === 'revenueSet' || type === 'revenueDelete') {
+    try {
+      if (type === 'salonDelete') { return handleSalonDelete_(body); }
+      if (type === 'salonEdit') { return handleSalonEdit_(body); }
+      if (type === 'signupDelete') { return handleSignupDelete_(body); }
+      if (type === 'leadDelete') { return handleLeadDelete_(body); }
+      if (type === 'revenueSet') { return handleRevenueSet_(body); }
+      if (type === 'revenueDelete') { return handleRevenueDelete_(body); }
+    } catch (err3) {
+      return jsonOut_({ error: 'Server error: ' + (err3 && err3.message ? err3.message : err3) });
+    }
   }
 
   return jsonOut_({ error: 'Unknown type: ' + type });
 }
 
 /* ============================================================
-   v4 — {type:'sendMail'} — FULL token only (gated in doPost).
-   Mail/SMS relay so the Netlify app site needs no SMTP creds:
-   everything sends as the executing Google account.
-
-   Body (either or both):
-     to, subject, text        -> one email
-     sms:{phone}, text        -> the text is sent to all 4 US
-                                 carrier email-to-text gateways
-                                 (blank subject; the carrier that
-                                 owns the number delivers it, the
-                                 rest bounce silently)
-
-   Every attempted send is appended to the MailLog tab
-   (ts, to, kind:'email'|'sms', subject, ok:true/false).
-   Returns {ok:true, sent:{email?, sms?}} or {error}.
+   v4 — audit trail
+   Every edit/delete handler appends a row to _AuditLog:
+   [ts, actor (body.actor || ''), type, ref/id/ym, fields JSON].
+   Audit failure NEVER breaks the action (best-effort try/catch);
+   the tab is auto-created here too in case setup() wasn't re-run.
    ============================================================ */
-function handleSendMail_(body) {
-  var text = String(body.text || '').trim();
-  if (!text) { return jsonOut_({ error: 'Need text' }); }
-
-  var to = String(body.to || '').trim();
-  var sms = (body.sms && typeof body.sms === 'object') ? body.sms : null;
-  var phone = sms ? normalizePhone_(String(sms.phone || '')) : '';
-
-  if (!to && !sms) { return jsonOut_({ error: 'Need to (email) and/or sms:{phone}' }); }
-  if (to && !isValidEmail_(to)) { return jsonOut_({ error: 'Invalid email: ' + to }); }
-  if (sms && !phone) { return jsonOut_({ error: 'Invalid sms phone — need a 10-digit US number' }); }
-
-  var sent = {};
-
-  /* ---- email leg ---- */
-  if (to) {
-    var subject = String(body.subject || '').trim().slice(0, MAX_MAIL_SUBJECT_CHARS) || 'Salon Vine';
-    var emailText = text.slice(0, MAX_MAIL_TEXT_CHARS);
-    var emailOk = true;
-    try {
-      MailApp.sendEmail(to, subject, emailText);
-    } catch (errMail) {
-      emailOk = false;
-      console.error('sendMail email failed for ' + to + ': ' + errMail);
-    }
-    logMail_(to, 'email', subject, emailOk);
-    sent.email = emailOk;
-    if (!emailOk && !sms) { return jsonOut_({ error: 'Email send failed' }); }
-  }
-
-  /* ---- sms leg (carrier gateways) ---- */
-  if (sms) {
-    var smsText = text.slice(0, MAX_SMS_TEXT_CHARS);
-    var okCount = 0;
-    SMS_GATEWAYS.forEach(function (gw) {
-      var addr = phone + '@' + gw;
-      var gwOk = true;
-      try {
-        /* blank subject — carriers show subject inline otherwise */
-        MailApp.sendEmail(addr, '', smsText);
-      } catch (errSms) {
-        gwOk = false;
-        console.error('sendMail sms failed for ' + addr + ': ' + errSms);
-      }
-      logMail_(addr, 'sms', '', gwOk);
-      if (gwOk) { okCount++; }
-    });
-    sent.sms = okCount;
-    if (okCount === 0 && !to) { return jsonOut_({ error: 'SMS send failed' }); }
-  }
-
-  return jsonOut_({ ok: true, sent: sent });
-}
-
-function isValidEmail_(s) {
-  return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(s) && s.length <= 254;
-}
-
-/* Strip formatting; accept 10-digit US numbers, or 11 digits
-   with a leading 1. Returns the bare 10 digits or ''. */
-function normalizePhone_(raw) {
-  var digits = String(raw || '').replace(/\D+/g, '');
-  if (digits.length === 11 && digits.charAt(0) === '1') { digits = digits.slice(1); }
-  return digits.length === 10 ? digits : '';
-}
-
-function logMail_(to, kind, subject, ok) {
+function audit_(body, type, ref, fields) {
   try {
-    appendByHeaders_(sheetOrCreate_(TABS.MAILLOG), {
-      ts: new Date().toISOString(),
-      to: to,
-      kind: kind,
-      subject: subject,
-      ok: ok
-    });
+    var ss = SpreadsheetApp.getActiveSpreadsheet();
+    var sh = ss.getSheetByName(TABS.AUDIT);
+    if (!sh) {
+      sh = ss.insertSheet(TABS.AUDIT);
+      sh.appendRow(HEADERS['_AuditLog']);
+      sh.setFrozenRows(1);
+    }
+    sh.appendRow([
+      new Date().toISOString(),
+      String((body && body.actor) || ''),
+      String(type || ''),
+      String(ref == null ? '' : ref),
+      JSON.stringify(fields || {}).slice(0, 500)
+    ]);
   } catch (err) {
-    console.error('MailLog append failed: ' + err);
+    console.error('audit_ failed (action still succeeded): ' + err);
   }
 }
 
 /* ============================================================
-   v4 — {type:'salonPlan'} — FULL token only (gated in doPost).
-   {slug} -> {ok, slug, plan, status} straight from the Salons
-   sheet. The app site uses this to enforce seat limits
-   (studio 3 / pro 10 / elite unlimited) server-side.
+   v4 — ref resolution for Salons rows.
+
+   Data reality in the live sheet:
+     - wizard rows:  salonId 'sal_<ts>_<n>', identifier in `slug`
+     - two old rows: identifier in `salonId` (studio17,
+       demo-iron-oak), slug EMPTY
+     - one junk row: salonId 'test-vine-studio'
+   So a ref matches when it equals EITHER column (trimmed). We
+   refuse to act unless exactly ONE row matches.
+
+   matchSalonRows_ is a PURE function (rows in, matches out) so it
+   is unit-testable in Node without any Apps Script services.
    ============================================================ */
-function handleSalonPlan_(body) {
-  var slug = String(body.slug || '').trim().toLowerCase();
-  if (!slug) { return jsonOut_({ error: 'Need slug' }); }
-
-  var found = findSalonRow_(slug);
-  if (!found) { return jsonOut_({ error: 'Unknown site: ' + slug }); }
-
-  return jsonOut_({
-    ok: true,
-    slug: slug,
-    plan: salonCell_(found, 'plan'),
-    status: salonCell_(found, 'status')
-  });
+function matchSalonRows_(rows, ref) {
+  var r = String(ref == null ? '' : ref).trim();
+  if (!r) { return []; }
+  var out = [];
+  for (var i = 0; i < rows.length; i++) {
+    var sid = String(rows[i].salonId == null ? '' : rows[i].salonId).trim();
+    var slg = String(rows[i].slug == null ? '' : rows[i].slug).trim();
+    if (sid === r || slg === r) { out.push(rows[i]); }
+  }
+  return out;
 }
 
-/* ============================================================
-   v4 — {type:'salonStatus'} — FULL token only (gated in doPost).
-   {slug, status} -> updates the salon row's status cell (for
-   future suspend/reactivate) and appends the transition to the
-   StatusLog tab (ts, slug, old, new).
-   Valid statuses: live / live-free / pending / suspended /
-   cancelled. Returns {ok, slug, old, new}.
-   ============================================================ */
-function handleSalonStatus_(body) {
-  var slug = String(body.slug || '').trim().toLowerCase();
-  var status = String(body.status || '').trim().toLowerCase();
-  if (!slug) { return jsonOut_({ error: 'Need slug' }); }
-  if (VALID_SALON_STATUSES.indexOf(status) === -1) {
-    return jsonOut_({ error: 'Invalid status — use one of: ' + VALID_SALON_STATUSES.join('/') });
+/* Reads the Salons sheet and resolves a ref to its matches.
+   Returns {sheet, cols, matches:[{rowNum,salonId,slug,name}]}. */
+function resolveSalonRef_(ref) {
+  var sh = sheet_(TABS.SALONS);
+  var cols = headerCols_(sh);
+  var values = sh.getDataRange().getValues();
+  var rows = [];
+  for (var r = 1; r < values.length; r++) {
+    rows.push({
+      rowNum: r + 1,
+      salonId: cols.salonId ? values[r][cols.salonId - 1] : '',
+      slug: cols.slug ? values[r][cols.slug - 1] : '',
+      name: cols.name ? values[r][cols.name - 1] : ''
+    });
+  }
+  return { sheet: sh, cols: cols, matches: matchSalonRows_(rows, ref) };
+}
+
+/* Shared 0-or-many refusal → returns an error TextOutput or null. */
+function refuseUnlessSingle_(matches, ref) {
+  if (matches.length === 0) {
+    return jsonOut_({ error: 'No salon matches ref: ' + ref });
+  }
+  if (matches.length > 1) {
+    return jsonOut_({ error: 'Ambiguous ref "' + ref + '" — matches ' + matches.length + ' rows; nothing was changed' });
+  }
+  return null;
+}
+
+/* ------------------------------------------------------------
+   {type:'salonDelete', ref} — v4, FULL token only.
+   ------------------------------------------------------------ */
+function handleSalonDelete_(body) {
+  var ref = String(body.ref || '').trim();
+  if (!ref) { return jsonOut_({ error: 'Need ref (salonId or slug)' }); }
+
+  var lock = LockService.getScriptLock();
+  lock.waitLock(10000);
+  try {
+    var res = resolveSalonRef_(ref);
+    var refuse = refuseUnlessSingle_(res.matches, ref);
+    if (refuse) { return refuse; }
+
+    var m = res.matches[0];
+    var deleted = {
+      salonId: String(m.salonId || ''),
+      slug: String(m.slug || ''),
+      name: String(m.name || '')
+    };
+    res.sheet.deleteRow(m.rowNum);
+    audit_(body, 'salonDelete', ref, deleted);
+    return jsonOut_({ ok: true, deleted: deleted });
+  } finally {
+    lock.releaseLock();
+  }
+}
+
+/* ------------------------------------------------------------
+   {type:'salonEdit', ref, fields:{...}} — v4, FULL token only.
+   Whitelisted columns: name/tagline/theme/accent/status/plan/url
+   (theme validated against THEMES). fields.hours / .instagram /
+   .services merge into the config JSON blob using the SAME
+   sanitizers as salonConfig / signupSite. Returns the updated
+   record (all sheet columns by header).
+   ------------------------------------------------------------ */
+function handleSalonEdit_(body) {
+  var ref = String(body.ref || '').trim();
+  var fields = (body.fields && typeof body.fields === 'object' && !Array.isArray(body.fields)) ? body.fields : null;
+  if (!ref || !fields) { return jsonOut_({ error: 'Need ref and a fields object' }); }
+
+  if (fields.theme !== undefined && THEMES.indexOf(String(fields.theme)) === -1) {
+    return jsonOut_({ error: 'Unknown theme: ' + fields.theme + ' (valid: ' + THEMES.join(', ') + ')' });
   }
 
   var lock = LockService.getScriptLock();
   lock.waitLock(10000);
   try {
-    var found = findSalonRow_(slug);
-    if (!found) { return jsonOut_({ error: 'Unknown site: ' + slug }); }
-    if (!found.cols.status) { return jsonOut_({ error: 'Salons tab missing status header — run setup()' }); }
+    var res = resolveSalonRef_(ref);
+    var refuse = refuseUnlessSingle_(res.matches, ref);
+    if (refuse) { return refuse; }
 
-    var old = salonCell_(found, 'status');
-    found.sheet.getRange(found.rowNum, found.cols.status).setValue(status);
+    var m = res.matches[0];
+    var sh = res.sheet;
+    var cols = res.cols;
 
-    try {
-      appendByHeaders_(sheetOrCreate_(TABS.STATUSLOG), {
-        ts: new Date().toISOString(),
-        slug: slug,
-        old: old,
-        'new': status
-      });
-    } catch (errLog) {
-      console.error('StatusLog append failed: ' + errLog);
+    /* 1) direct whitelisted columns (only the provided ones) */
+    SALON_EDIT_COLS.forEach(function (h) {
+      if (fields[h] !== undefined && cols[h]) {
+        sh.getRange(m.rowNum, cols[h]).setValue(String(fields[h]).slice(0, 300));
+      }
+    });
+
+    /* 2) config-blob keys (hours / instagram / services) */
+    var touchesConfig = (fields.hours !== undefined || fields.instagram !== undefined || fields.services !== undefined);
+    if (touchesConfig) {
+      if (!cols.config) { return jsonOut_({ error: 'Salons tab missing config header — run setup()' }); }
+      var cfg = {};
+      try { cfg = JSON.parse(String(sh.getRange(m.rowNum, cols.config).getValue() || '{}')); } catch (e1) { cfg = {}; }
+      if (!cfg || typeof cfg !== 'object') { cfg = {}; }
+      if (fields.hours !== undefined) { cfg.hours = sanitizeHours_(fields.hours); }
+      if (fields.instagram !== undefined) { cfg.instagram = sanitizeInstagram_(fields.instagram); }
+      if (fields.services !== undefined) { cfg.services = sanitizeServices_(fields.services); }
+      sh.getRange(m.rowNum, cols.config).setValue(JSON.stringify(cfg));
     }
 
-    return jsonOut_({ ok: true, slug: slug, old: old, 'new': status });
+    /* 3) read the row back as the updated record */
+    var width = Math.max(sh.getLastColumn(), 1);
+    var rowVals = sh.getRange(m.rowNum, 1, 1, width).getValues()[0];
+    var record = {};
+    Object.keys(cols).forEach(function (h) {
+      var v = rowVals[cols[h] - 1];
+      record[h] = (v instanceof Date) ? v.toISOString() : v;
+    });
+
+    audit_(body, 'salonEdit', ref, fields);
+    return jsonOut_({ ok: true, salon: record });
+  } finally {
+    lock.releaseLock();
+  }
+}
+
+/* ------------------------------------------------------------
+   {type:'signupDelete', id} — v4, FULL token only.
+   ------------------------------------------------------------ */
+function handleSignupDelete_(body) {
+  var id = String(body.id || '').trim();
+  if (!id) { return jsonOut_({ error: 'Need id' }); }
+
+  var lock = LockService.getScriptLock();
+  lock.waitLock(10000);
+  try {
+    var sh = sheet_(TABS.SIGNUPS);
+    var cols = headerCols_(sh);
+    if (!cols.id) { return jsonOut_({ error: 'Signups tab missing id header — run setup()' }); }
+    var values = sh.getDataRange().getValues();
+    for (var r = 1; r < values.length; r++) {
+      if (String(values[r][cols.id - 1]).trim() === id) {
+        var deleted = {
+          id: id,
+          salon: cols.salon ? String(values[r][cols.salon - 1]) : ''
+        };
+        sh.deleteRow(r + 1);
+        audit_(body, 'signupDelete', id, deleted);
+        return jsonOut_({ ok: true, deleted: deleted });
+      }
+    }
+    return jsonOut_({ error: 'Signup not found: ' + id });
+  } finally {
+    lock.releaseLock();
+  }
+}
+
+/* ------------------------------------------------------------
+   {type:'leadDelete', ts, slug} — v4, FULL token only.
+   SiteLeads has NO id column; the (ts, slug) pair is the key.
+   Sheet ts cells may come back as Date objects — normalize to
+   the ISO string before comparing. Refuses on 0 or >1 matches.
+   ------------------------------------------------------------ */
+function handleLeadDelete_(body) {
+  var ts = String(body.ts || '').trim();
+  var slug = String(body.slug || '').trim();
+  if (!ts || !slug) { return jsonOut_({ error: 'Need ts and slug' }); }
+
+  var lock = LockService.getScriptLock();
+  lock.waitLock(10000);
+  try {
+    var sh = sheet_(TABS.SITELEADS);
+    var cols = headerCols_(sh);
+    if (!cols.ts || !cols.slug) { return jsonOut_({ error: 'SiteLeads tab missing ts/slug headers — run setup()' }); }
+    var values = sh.getDataRange().getValues();
+    var matches = [];
+    for (var r = 1; r < values.length; r++) {
+      var cell = values[r][cols.ts - 1];
+      var rowTs = (cell instanceof Date) ? cell.toISOString() : String(cell).trim();
+      var rowSlug = String(values[r][cols.slug - 1]).trim();
+      if (rowTs === ts && rowSlug === slug) {
+        matches.push({
+          rowNum: r + 1,
+          name: cols.name ? String(values[r][cols.name - 1]) : ''
+        });
+      }
+    }
+    if (matches.length === 0) {
+      return jsonOut_({ error: 'No booking matches ts ' + ts + ' + slug ' + slug });
+    }
+    if (matches.length > 1) {
+      return jsonOut_({ error: 'Ambiguous booking (' + matches.length + ' rows match ts ' + ts + ' + slug ' + slug + '); nothing was changed' });
+    }
+    var deleted = { ts: ts, slug: slug, name: matches[0].name };
+    sh.deleteRow(matches[0].rowNum);
+    audit_(body, 'leadDelete', ts + ' ' + slug, deleted);
+    return jsonOut_({ ok: true, deleted: deleted });
+  } finally {
+    lock.releaseLock();
+  }
+}
+
+/* ------------------------------------------------------------
+   v4 Revenue helpers + handlers.
+   ------------------------------------------------------------ */
+function validYm_(ym) {
+  var m = String(ym || '').trim().match(/^(\d{4})-(0[1-9]|1[0-2])$/);
+  return m ? m[0] : '';
+}
+
+function revNum_(v) {
+  var n = Number(v);
+  return isNaN(n) ? 0 : n;
+}
+
+/* {type:'revenueSet', ym, fields:{...}} — upsert keyed by ym. */
+function handleRevenueSet_(body) {
+  var ym = validYm_(body.ym);
+  if (!ym) { return jsonOut_({ error: 'Need ym in YYYY-MM format' }); }
+  var fields = (body.fields && typeof body.fields === 'object' && !Array.isArray(body.fields)) ? body.fields : {};
+
+  var lock = LockService.getScriptLock();
+  lock.waitLock(10000);
+  try {
+    var sh = sheet_(TABS.REVENUE);
+    var cols = headerCols_(sh);
+    if (!cols.ym) { return jsonOut_({ error: 'Revenue tab missing ym header — run setup()' }); }
+    var values = sh.getDataRange().getValues();
+    var rowNum = 0;
+    for (var r = 1; r < values.length; r++) {
+      if (String(values[r][cols.ym - 1]).trim() === ym) { rowNum = r + 1; break; }
+    }
+
+    if (rowNum) {
+      /* update only the provided whitelisted fields */
+      REV_FIELDS.forEach(function (h) {
+        if (fields[h] !== undefined && cols[h]) {
+          sh.getRange(rowNum, cols[h]).setValue(revNum_(fields[h]));
+        }
+      });
+    } else {
+      /* insert — unprovided fields default to 0 */
+      var obj = { ym: ym };
+      REV_FIELDS.forEach(function (h) { obj[h] = revNum_(fields[h]); });
+      appendByHeaders_(sh, obj);
+      rowNum = sh.getLastRow();
+    }
+
+    /* read the row back */
+    var width = Math.max(sh.getLastColumn(), 1);
+    var rowVals = sh.getRange(rowNum, 1, 1, width).getValues()[0];
+    var record = { ym: ym };
+    REV_FIELDS.forEach(function (h) {
+      record[h] = cols[h] ? revNum_(rowVals[cols[h] - 1]) : 0;
+    });
+
+    audit_(body, 'revenueSet', ym, fields);
+    return jsonOut_({ ok: true, month: record });
+  } finally {
+    lock.releaseLock();
+  }
+}
+
+/* {type:'revenueDelete', ym} */
+function handleRevenueDelete_(body) {
+  var ym = validYm_(body.ym);
+  if (!ym) { return jsonOut_({ error: 'Need ym in YYYY-MM format' }); }
+
+  var lock = LockService.getScriptLock();
+  lock.waitLock(10000);
+  try {
+    var sh = sheet_(TABS.REVENUE);
+    var cols = headerCols_(sh);
+    if (!cols.ym) { return jsonOut_({ error: 'Revenue tab missing ym header — run setup()' }); }
+    var values = sh.getDataRange().getValues();
+    for (var r = 1; r < values.length; r++) {
+      if (String(values[r][cols.ym - 1]).trim() === ym) {
+        sh.deleteRow(r + 1);
+        audit_(body, 'revenueDelete', ym, {});
+        return jsonOut_({ ok: true, deleted: { ym: ym } });
+      }
+    }
+    return jsonOut_({ error: 'Revenue month not found: ' + ym });
   } finally {
     lock.releaseLock();
   }
@@ -814,24 +960,6 @@ function notifyOwnersOfSignup_(body, id, when) {
    last 24h (e.g. the visitor hit Retry after a partial failure),
    the existing slug/url is returned instead of a duplicate site.
    ------------------------------------------------------------ */
-
-/* v4.1: after any signupSite, tell the multi-tenant app to provision the
-   owner account + send the portal invite. Never allowed to fail a signup. */
-function provisionOwner_(salon, name, email, phone, slug, url) {
-  try {
-    UrlFetchApp.fetch('https://salonvine-app.netlify.app/.netlify/functions/provision-owner', {
-      method: 'post',
-      contentType: 'application/json',
-      muteHttpExceptions: true,
-      payload: JSON.stringify({
-        token: fullToken_(),
-        salon: salon, name: name, email: email, phone: phone,
-        slug: slug, url: url
-      })
-    });
-  } catch (e) { /* best-effort */ }
-}
-
 function handleSignupSite_(body) {
   var lock = LockService.getScriptLock();
   lock.waitLock(15000);
@@ -853,7 +981,6 @@ function handleSignupSite_(body) {
         var created = new Date(s.createdAt);
         if (!isNaN(created.getTime()) && (now.getTime() - created.getTime()) < DAY) {
           signupCore_(body, now); /* still record/dedupe the lead */
-          provisionOwner_(String(body.salon || ''), String(body.name || ''), email, String(body.phone || ''), String(s.slug), String(s.url || (PUBLIC_SITE_BASE + s.slug)));
           return jsonOut_({ ok: true, id: '', slug: String(s.slug), url: String(s.url || (PUBLIC_SITE_BASE + s.slug)), existing: true });
         }
       }
@@ -891,7 +1018,6 @@ function handleSignupSite_(body) {
       createdAt: now.toISOString()
     });
 
-    provisionOwner_(String(body.salon || ''), String(body.name || ''), email, String(body.phone || ''), slug, url);
     return jsonOut_({ ok: true, id: su.id, slug: slug, url: url });
   } finally {
     lock.releaseLock();
