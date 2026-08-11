@@ -1,95 +1,110 @@
 /* ============================================================
-   SalonVine — Live Data backend v4 (Google Apps Script)
+   SalonVine — Live Data backend v4.1 (Google Apps Script)
 
-   v4 = v3 + full owner edit/delete for the owner portal.
-   EVERY v1/v2/v3 handler keeps working unchanged.
-
-   New in v4 (ALL full-token only, all audited to _AuditLog):
-     - {type:'salonDelete', ref}
-                   ref matches the salonId column OR the slug
-                   column (wizard rows key on slug, the two older
-                   rows — studio17 / demo-iron-oak — key on
-                   salonId). Refuses on 0 or >1 matches. Deletes
-                   the Salons sheet row. Returns
-                   {ok, deleted:{salonId,slug,name}}.
-     - {type:'salonEdit', ref, fields:{...}}
-                   Same ref resolution. Updates only provided
-                   whitelisted columns (name/tagline/theme/accent/
-                   status/plan/url; theme validated against the 6
-                   known themes) plus fields.hours / .instagram /
-                   .services which merge into the config JSON blob
-                   with the same sanitizers as salonConfig.
-                   Returns {ok, salon:{...updated record...}}.
-     - {type:'signupDelete', id}
-                   Deletes the Signups row by id.
-                   Returns {ok, deleted:{id,salon}}.
-     - {type:'leadDelete', ts, slug}
-                   Deletes the SiteLeads row where
-                   String(ts)===String(row.ts) && slug matches
-                   (SiteLeads has no id column; the ISO ts is
-                   unique enough). Refuses on 0 or >1 matches.
-     - {type:'revenueSet', ym, fields:{revenue?,studio?,pro?,
-                   elite?,trials?,conversions?,churn?}}
-                   Upserts the Revenue row keyed by ym
-                   (YYYY-MM validated, numeric coercion).
-     - {type:'revenueDelete', ym}
-     - _AuditLog tab: every v4 handler appends
-                   [ts, actor, type, ref, fields-json(<=500ch)].
-                   Audit failure NEVER breaks the action.
-
-   setup() stays migration-safe (now also adds the _AuditLog tab
-   if missing). doGet is unchanged. Nothing was removed.
+   v4 adds the mail/SMS relay for the multi-tenant app site
+   (salonvine-app.netlify.app), plus plan/status lookups so the
+   app can enforce seat limits and (later) suspend/reactivate
+   salons. EVERY v1/v2/v3 handler keeps working unchanged.
 
    ------------------------------------------------------------
-   v3 added services / hours / Instagram to instant sites, the
-   SiteLeads feed for the owner portal, and a full-token config
-   patch handler. EVERY v1/v2 handler keeps working unchanged:
-     - {type:'signup'}        signup token OR full token
-     - {type:'signupStatus'}  full token only
-     - {type:'salon'}         full token only
-     - doGet?token=SV_TOKEN   full data read
+   ENDPOINT REFERENCE (all of them, v1 -> v4)
+   ------------------------------------------------------------
+   doGet:
+     ?site=<slug>            PUBLIC, no token. Safe site config
+                             only ({slug,name,tagline,theme,
+                             accent,photos,services,hours,
+                             instagram}) and only for salons with
+                             status 'live-free' / 'live'. Never
+                             includes email/phone/plan/status.
+     ?token=<SV_TOKEN>       Full data read: {signups, months,
+                             salons, siteLeads}.
 
-   New in v3:
-     - {type:'signupSite'}    now also accepts services:[{name,price}],
-                              hours (short text) and instagram (handle) —
-                              stored inside the Salons.config JSON blob.
-     - doGet?site=<slug>      public payload now also includes
-                              services / hours / instagram (still no
-                              email, phone, plan or status).
-     - doGet?token=SV_TOKEN   response gains siteLeads: [...] (the
-                              SiteLeads tab) for the portal Bookings view.
-     - {type:'salonConfig'}   FULL token only. {slug, patch:{...}} —
-                              shallow-merges whitelisted-sanitized keys
-                              into that salon's config JSON (owner-portal
-                              editing, future site editor).
+   doPost (body = text/plain JSON, avoids CORS preflight):
+     Light token (SV_SIGNUP_TOKEN) or full token (SV_TOKEN):
+       {type:'signup'}       v1. Lead row in Signups + owner
+                             notify email. 10-min email de-dupe.
+                             Returns {ok,id,deduped?}.
+       {type:'signupSite'}   v2/v3. Everything 'signup' does PLUS
+                             creates a live Salons row (unique
+                             slug, theme/accent/tagline, and v3
+                             extras services/hours/instagram in
+                             the config blob). 24h retry guard by
+                             email. Returns {ok,id,slug,url}.
+       {type:'sitePhoto'}    v2. {slug,n,data:base64 dataURL} ->
+                             Drive "SalonVine Sites/<slug>/",
+                             shared link appended to photos.
+                             Cap 8/salon. Returns {ok,url,count}.
+       {type:'siteLead'}     v2. {slug,name,phone,email,message}
+                             -> SiteLeads row + email to salon
+                             owner and SalonVine owners. 5-min
+                             de-dupe. Returns {ok}.
+       {type:'findSite'}     v3. {email} -> newest LIVE site for
+                             that signup email. Only reveals
+                             {slug,url,salonName}.
+     Full token (SV_TOKEN) ONLY:
+       {type:'signupStatus'} v1. {id,status:new/contacted/
+                             converted/lost}. Returns {ok}.
+       {type:'salon'}        v1. Header-driven upsert of a Salons
+                             row by salonId. Returns {ok}.
+       {type:'salonConfig'}  v3. {slug,patch:{...}} shallow-merge
+                             into the salon's config JSON blob
+                             (services/hours/instagram sanitized,
+                             signupId protected, null deletes).
+                             Returns {ok,slug,config}.
+       {type:'sendMail'}     v4. Mail/SMS relay for the app site.
+                             {to,subject,text} sends an email as
+                             the executing account; {sms:{phone},
+                             text} sends the text to the 4 US
+                             carrier email-to-text gateways
+                             (vtext.com, tmomail.net, txt.att.net,
+                             messaging.sprintpcs.com) with a blank
+                             subject. Both may be combined in one
+                             call. Every send is logged to the
+                             MailLog tab. Returns {ok,sent} or
+                             {error}.
+       {type:'salonPlan'}    v4. {slug} -> {ok,slug,plan,status}
+                             from the Salons sheet. Used by the
+                             app site to enforce per-plan seat
+                             limits (studio 3 / pro 10 / elite
+                             unlimited).
+       {type:'salonStatus'}  v4. {slug,status} -> updates the
+                             salon row's status cell (future
+                             suspend/reactivate) and appends to
+                             the StatusLog tab (ts,slug,old,new).
+                             Returns {ok,slug,old,new}.
 
-   From v2 (unchanged):
-     - {type:'signupSite'}    signup token ok — signup row + owner
-                              email + creates a live Salons row with
-                              a unique slug. Returns {ok,id,slug,url}.
-     - {type:'sitePhoto'}     signup token ok — saves a base64 JPEG
-                              to Drive "SalonVine Sites/<slug>/",
-                              shares anyone-with-link, appends the
-                              lh3.googleusercontent URL to the
-                              salon's photos JSON. Cap 8/salon.
-     - {type:'siteLead'}      signup token ok — booking request from
-                              a live salon site. Stored in SiteLeads
-                              tab + emailed to the salon owner AND
-                              the SalonVine owners.
-     - doGet?site=<slug>      NO token — public site config only
-                              ({slug,name,tagline,theme,accent,photos})
-                              for status 'live-free'/'live' salons.
+   ------------------------------------------------------------
+   *** ROTATION NOTE — SV_SIGNUP_TOKEN (do this with v4) ***
+   ------------------------------------------------------------
+   The old SV_SIGNUP_TOKEN was exposed in the public page source
+   of the marketing site, so anyone could read it and spam the
+   light-token endpoints. It MUST be rotated when v4 ships, and
+   the marketing site must stop shipping it to the browser (the
+   new app site keeps it server-side only, in the signup-proxy
+   Netlify function). Steps:
+     1. Apps Script editor -> Project Settings -> Script
+        Properties -> edit SV_SIGNUP_TOKEN -> paste a NEW long
+        random value -> Save. (Old token dies instantly; no
+        redeploy of the web app is needed for property changes.)
+     2. Netlify site "salonvine-app" -> Site configuration ->
+        Environment variables -> update SV_SIGNUP_TOKEN to the
+        same new value -> redeploy functions.
+     3. Confirm no client-side file (marketing site or app site)
+        contains the new value — it may only ever live in Script
+        Properties and Netlify env vars.
 
+   ------------------------------------------------------------
    Install/upgrade: open the "SalonVine — Live Data" Sheet ->
    Extensions -> Apps Script -> replace the file with this one ->
    run setup() once (migration-safe: appends missing headers /
-   missing tabs, never wipes) -> Deploy -> Manage deployments ->
-   edit the EXISTING web-app deployment -> New version. The /exec
-   URL stays the same.
+   missing tabs incl. the new MailLog + StatusLog, never wipes)
+   -> Deploy -> Manage deployments -> edit the EXISTING web-app
+   deployment -> New version. The /exec URL stays the same.
 
-   Script Properties (unchanged):
+   Script Properties:
      SV_TOKEN        — full read/write token
-     SV_SIGNUP_TOKEN — light public token for the marketing site
+     SV_SIGNUP_TOKEN — light token, server-side only (see
+                       ROTATION NOTE above)
    ============================================================ */
 
 /* ---------- Owner notification list ---------- */
@@ -101,12 +116,23 @@ var MAX_PHOTOS_PER_SALON = 8;
 /* ~6MB of binary is ~8.4M base64 chars (incl. dataURL header slack) */
 var MAX_PHOTO_POST_CHARS = 8600000;
 
+/* v4 mail relay limits */
+var MAX_MAIL_TEXT_CHARS = 10000;
+var MAX_SMS_TEXT_CHARS = 300;
+var MAX_MAIL_SUBJECT_CHARS = 200;
+var SMS_GATEWAYS = ['vtext.com', 'tmomail.net', 'txt.att.net', 'messaging.sprintpcs.com'];
+
+/* v4 salonStatus whitelist */
+var VALID_SALON_STATUSES = ['live', 'live-free', 'pending', 'suspended', 'cancelled'];
+
 var TABS = {
   SIGNUPS: 'Signups',
   REVENUE: 'Revenue',
   SALONS: 'Salons',
   SITELEADS: 'SiteLeads',
-  AUDIT: '_AuditLog'          /* v4 */
+  MAILLOG: 'MailLog',
+  STATUSLOG: 'StatusLog',
+  AUDIT: '_AuditLog'          /* v4 edit/delete audit */
 };
 
 var HEADERS = {
@@ -116,19 +142,11 @@ var HEADERS = {
      live sheets migrate by adding columns on the right. */
   Salons:  ['salonId', 'name', 'url', 'plan', 'status', 'slug', 'theme', 'accent', 'tagline', 'photos', 'config', 'createdAt'],
   SiteLeads: ['ts', 'slug', 'name', 'phone', 'email', 'message'],
-  /* v4: audit trail — setup() creates it via the same
-     migration-safe loop (adds the tab if missing, never wipes). */
+  /* v4 */
+  MailLog: ['ts', 'to', 'kind', 'subject', 'ok'],
+  StatusLog: ['ts', 'slug', 'old', 'new'],
   '_AuditLog': ['ts', 'actor', 'type', 'ref', 'fields']
 };
-
-/* v4: the 6 known site themes (mirror of the wizard/renderer) */
-var THEMES = ['classic-cream', 'midnight', 'rose-gold', 'sage-spa', 'bold-noir', 'ocean'];
-
-/* v4: whitelisted Salons columns the portal may edit directly */
-var SALON_EDIT_COLS = ['name', 'tagline', 'theme', 'accent', 'status', 'plan', 'url'];
-
-/* v4: whitelisted Revenue fields */
-var REV_FIELDS = ['revenue', 'studio', 'pro', 'elite', 'trials', 'conversions', 'churn'];
 
 /* ============================================================
    Setup — run once. Migration-safe:
@@ -183,6 +201,22 @@ function jsonOut_(obj) {
 function sheet_(name) {
   var sh = SpreadsheetApp.getActiveSpreadsheet().getSheetByName(name);
   if (!sh) { throw new Error('Missing tab: ' + name + ' — run setup()'); }
+  return sh;
+}
+
+/* v4: like sheet_() but self-heals — creates the tab with its
+   headers if it's missing, so sendMail/salonStatus keep working
+   even if setup() wasn't re-run after upgrading to v4. */
+function sheetOrCreate_(name) {
+  var ss = SpreadsheetApp.getActiveSpreadsheet();
+  var sh = ss.getSheetByName(name);
+  if (sh) { return sh; }
+  sh = ss.insertSheet(name);
+  var want = HEADERS[name] || [];
+  if (want.length) {
+    sh.getRange(1, 1, 1, want.length).setValues([want]);
+    sh.setFrozenRows(1);
+  }
   return sh;
 }
 
@@ -387,8 +421,13 @@ function publicSiteConfig_(slugRaw) {
      {type:'signupSite'}   signup token or full token   (v2)
      {type:'sitePhoto'}    signup token or full token   (v2)
      {type:'siteLead'}     signup token or full token   (v2)
+     {type:'findSite'}     signup token or full token   (v3)
      {type:'signupStatus'} full token only              (v1)
      {type:'salon'}        full token only              (v1)
+     {type:'salonConfig'}  full token only              (v3)
+     {type:'sendMail'}     full token only              (v4)
+     {type:'salonPlan'}    full token only              (v4)
+     {type:'salonStatus'}  full token only              (v4)
    Body arrives as text/plain JSON (avoids CORS preflight).
    ============================================================ */
 function doPost(e) {
@@ -424,34 +463,662 @@ function doPost(e) {
   if (!isFullToken_(token)) {
     return jsonOut_({ error: 'Unauthorized' });
   }
-  if (type === 'signupStatus') { return handleSignupStatus_(body); }
-  if (type === 'salon') { return handleSalonUpsert_(body); }
-  if (type === 'salonConfig') { return handleSalonConfig_(body); }
+  try {
+    if (type === 'signupStatus') { return handleSignupStatus_(body); }
+    if (type === 'salon') { return handleSalonUpsert_(body); }
+    if (type === 'salonConfig') { return handleSalonConfig_(body); }
+    /* v4 */
+    if (type === 'sendMail') { return handleSendMail_(body); }
+    if (type === 'salonPlan') { return handleSalonPlan_(body); }
+    if (type === 'salonStatus') { return handleSalonStatus_(body); }
 
-  /* ---- v4 owner edit/delete handlers (full token only) ---- */
-  if (type === 'salonDelete' || type === 'salonEdit' || type === 'signupDelete' ||
-      type === 'leadDelete' || type === 'revenueSet' || type === 'revenueDelete') {
-    try {
-      if (type === 'salonDelete') { return handleSalonDelete_(body); }
-      if (type === 'salonEdit') { return handleSalonEdit_(body); }
-      if (type === 'signupDelete') { return handleSignupDelete_(body); }
-      if (type === 'leadDelete') { return handleLeadDelete_(body); }
-      if (type === 'revenueSet') { return handleRevenueSet_(body); }
-      if (type === 'revenueDelete') { return handleRevenueDelete_(body); }
-    } catch (err3) {
-      return jsonOut_({ error: 'Server error: ' + (err3 && err3.message ? err3.message : err3) });
-    }
+    /* v4 — owner edit/delete (full token; api.js injects actor) */
+    if (type === 'salonDelete') { return handleSalonDelete_(body); }
+    if (type === 'salonEdit') { return handleSalonEdit_(body); }
+    if (type === 'signupDelete') { return handleSignupDelete_(body); }
+    if (type === 'leadDelete') { return handleLeadDelete_(body); }
+    if (type === 'revenueSet') { return handleRevenueSet_(body); }
+    if (type === 'revenueDelete') { return handleRevenueDelete_(body); }
+  } catch (err3) {
+    return jsonOut_({ error: 'Server error: ' + (err3 && err3.message ? err3.message : err3) });
   }
 
   return jsonOut_({ error: 'Unknown type: ' + type });
 }
 
 /* ============================================================
-   v4 — audit trail
-   Every edit/delete handler appends a row to _AuditLog:
-   [ts, actor (body.actor || ''), type, ref/id/ym, fields JSON].
-   Audit failure NEVER breaks the action (best-effort try/catch);
-   the tab is auto-created here too in case setup() wasn't re-run.
+   v4 — {type:'sendMail'} — FULL token only (gated in doPost).
+   Mail/SMS relay so the Netlify app site needs no SMTP creds:
+   everything sends as the executing Google account.
+
+   Body (either or both):
+     to, subject, text        -> one email
+     sms:{phone}, text        -> the text is sent to all 4 US
+                                 carrier email-to-text gateways
+                                 (blank subject; the carrier that
+                                 owns the number delivers it, the
+                                 rest bounce silently)
+
+   Every attempted send is appended to the MailLog tab
+   (ts, to, kind:'email'|'sms', subject, ok:true/false).
+   Returns {ok:true, sent:{email?, sms?}} or {error}.
+   ============================================================ */
+function handleSendMail_(body) {
+  var text = String(body.text || '').trim();
+  if (!text) { return jsonOut_({ error: 'Need text' }); }
+
+  var to = String(body.to || '').trim();
+  var sms = (body.sms && typeof body.sms === 'object') ? body.sms : null;
+  var phone = sms ? normalizePhone_(String(sms.phone || '')) : '';
+
+  if (!to && !sms) { return jsonOut_({ error: 'Need to (email) and/or sms:{phone}' }); }
+  if (to && !isValidEmail_(to)) { return jsonOut_({ error: 'Invalid email: ' + to }); }
+  if (sms && !phone) { return jsonOut_({ error: 'Invalid sms phone — need a 10-digit US number' }); }
+
+  var sent = {};
+
+  /* ---- email leg ---- */
+  if (to) {
+    var subject = String(body.subject || '').trim().slice(0, MAX_MAIL_SUBJECT_CHARS) || 'Salon Vine';
+    var emailText = text.slice(0, MAX_MAIL_TEXT_CHARS);
+    var emailOk = true;
+    try {
+      MailApp.sendEmail(to, subject, emailText);
+    } catch (errMail) {
+      emailOk = false;
+      console.error('sendMail email failed for ' + to + ': ' + errMail);
+    }
+    logMail_(to, 'email', subject, emailOk);
+    sent.email = emailOk;
+    if (!emailOk && !sms) { return jsonOut_({ error: 'Email send failed' }); }
+  }
+
+  /* ---- sms leg (carrier gateways) ---- */
+  if (sms) {
+    var smsText = text.slice(0, MAX_SMS_TEXT_CHARS);
+    var okCount = 0;
+    SMS_GATEWAYS.forEach(function (gw) {
+      var addr = phone + '@' + gw;
+      var gwOk = true;
+      try {
+        /* blank subject — carriers show subject inline otherwise */
+        MailApp.sendEmail(addr, '', smsText);
+      } catch (errSms) {
+        gwOk = false;
+        console.error('sendMail sms failed for ' + addr + ': ' + errSms);
+      }
+      logMail_(addr, 'sms', '', gwOk);
+      if (gwOk) { okCount++; }
+    });
+    sent.sms = okCount;
+    if (okCount === 0 && !to) { return jsonOut_({ error: 'SMS send failed' }); }
+  }
+
+  return jsonOut_({ ok: true, sent: sent });
+}
+
+function isValidEmail_(s) {
+  return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(s) && s.length <= 254;
+}
+
+/* Strip formatting; accept 10-digit US numbers, or 11 digits
+   with a leading 1. Returns the bare 10 digits or ''. */
+function normalizePhone_(raw) {
+  var digits = String(raw || '').replace(/\D+/g, '');
+  if (digits.length === 11 && digits.charAt(0) === '1') { digits = digits.slice(1); }
+  return digits.length === 10 ? digits : '';
+}
+
+function logMail_(to, kind, subject, ok) {
+  try {
+    appendByHeaders_(sheetOrCreate_(TABS.MAILLOG), {
+      ts: new Date().toISOString(),
+      to: to,
+      kind: kind,
+      subject: subject,
+      ok: ok
+    });
+  } catch (err) {
+    console.error('MailLog append failed: ' + err);
+  }
+}
+
+/* ============================================================
+   v4 — {type:'salonPlan'} — FULL token only (gated in doPost).
+   {slug} -> {ok, slug, plan, status} straight from the Salons
+   sheet. The app site uses this to enforce seat limits
+   (studio 3 / pro 10 / elite unlimited) server-side.
+   ============================================================ */
+function handleSalonPlan_(body) {
+  var slug = String(body.slug || '').trim().toLowerCase();
+  if (!slug) { return jsonOut_({ error: 'Need slug' }); }
+
+  var found = findSalonRow_(slug);
+  if (!found) { return jsonOut_({ error: 'Unknown site: ' + slug }); }
+
+  return jsonOut_({
+    ok: true,
+    slug: slug,
+    plan: salonCell_(found, 'plan'),
+    status: salonCell_(found, 'status')
+  });
+}
+
+/* ============================================================
+   v4 — {type:'salonStatus'} — FULL token only (gated in doPost).
+   {slug, status} -> updates the salon row's status cell (for
+   future suspend/reactivate) and appends the transition to the
+   StatusLog tab (ts, slug, old, new).
+   Valid statuses: live / live-free / pending / suspended /
+   cancelled. Returns {ok, slug, old, new}.
+   ============================================================ */
+function handleSalonStatus_(body) {
+  var slug = String(body.slug || '').trim().toLowerCase();
+  var status = String(body.status || '').trim().toLowerCase();
+  if (!slug) { return jsonOut_({ error: 'Need slug' }); }
+  if (VALID_SALON_STATUSES.indexOf(status) === -1) {
+    return jsonOut_({ error: 'Invalid status — use one of: ' + VALID_SALON_STATUSES.join('/') });
+  }
+
+  var lock = LockService.getScriptLock();
+  lock.waitLock(10000);
+  try {
+    var found = findSalonRow_(slug);
+    if (!found) { return jsonOut_({ error: 'Unknown site: ' + slug }); }
+    if (!found.cols.status) { return jsonOut_({ error: 'Salons tab missing status header — run setup()' }); }
+
+    var old = salonCell_(found, 'status');
+    found.sheet.getRange(found.rowNum, found.cols.status).setValue(status);
+
+    try {
+      appendByHeaders_(sheetOrCreate_(TABS.STATUSLOG), {
+        ts: new Date().toISOString(),
+        slug: slug,
+        old: old,
+        'new': status
+      });
+    } catch (errLog) {
+      console.error('StatusLog append failed: ' + errLog);
+    }
+
+    return jsonOut_({ ok: true, slug: slug, old: old, 'new': status });
+  } finally {
+    lock.releaseLock();
+  }
+}
+
+/* ------------------------------------------------------------
+   {type:'salonConfig', slug, patch:{...}} — v3, FULL token only
+   (gated in doPost above). Shallow-merges the patch into the
+   salon's config JSON blob. services / hours / instagram are
+   sanitized; other keys are stored as short strings so the
+   owner portal / future editor can extend config without a
+   backend release. signupId is protected.
+   ------------------------------------------------------------ */
+function handleSalonConfig_(body) {
+  var slug = String(body.slug || '').trim().toLowerCase();
+  var patch = (body.patch && typeof body.patch === 'object' && !Array.isArray(body.patch)) ? body.patch : null;
+  if (!slug || !patch) { return jsonOut_({ error: 'Need slug and patch object' }); }
+
+  var lock = LockService.getScriptLock();
+  lock.waitLock(10000);
+  try {
+    var found = findSalonRow_(slug);
+    if (!found) { return jsonOut_({ error: 'Unknown site: ' + slug }); }
+    if (!found.cols.config) { return jsonOut_({ error: 'Salons tab missing config header — run setup()' }); }
+
+    var cfg = {};
+    try { cfg = JSON.parse(salonCell_(found, 'config') || '{}'); } catch (e1) { cfg = {}; }
+    if (!cfg || typeof cfg !== 'object') { cfg = {}; }
+
+    Object.keys(patch).forEach(function (k) {
+      if (k === 'signupId') { return; } /* provenance is immutable */
+      if (k === 'services') { cfg.services = sanitizeServices_(patch.services); return; }
+      if (k === 'hours') { cfg.hours = sanitizeHours_(patch.hours); return; }
+      if (k === 'instagram') { cfg.instagram = sanitizeInstagram_(patch.instagram); return; }
+      if (patch[k] === null) { delete cfg[k]; return; } /* null deletes a key */
+      cfg[k] = String(patch[k]).slice(0, 500);
+    });
+
+    found.sheet.getRange(found.rowNum, found.cols.config).setValue(JSON.stringify(cfg));
+    return jsonOut_({ ok: true, slug: slug, config: cfg });
+  } finally {
+    lock.releaseLock();
+  }
+}
+
+/* ------------------------------------------------------------
+   {type:'findSite', email} — light-token lookup used by the
+   marketing site's "Find your salon" (login) page. Returns the
+   newest LIVE instant site whose signup email matches. Only
+   reveals slug/url/name — nothing else.
+   ------------------------------------------------------------ */
+function handleFindSite_(body) {
+  var email = String(body.email || '').trim().toLowerCase();
+  if (!email) { return jsonOut_({ ok: true, found: false }); }
+
+  var salons = readTab_(TABS.SALONS);
+  var hit = null;
+  for (var i = 0; i < salons.length; i++) {
+    var sal = salons[i];
+    var status = String(sal.status || '').toLowerCase();
+    if (status !== 'live-free' && status !== 'live') { continue; }
+    var cfg = {};
+    try { cfg = JSON.parse(String(sal.config || '{}')); } catch (e) { cfg = {}; }
+    if (String(cfg.email || '').trim().toLowerCase() === email) {
+      hit = sal; /* keep last (newest) match */
+    }
+  }
+
+  if (!hit) { return jsonOut_({ ok: true, found: false }); }
+  var slug = String(hit.slug || hit.salonId || '');
+  return jsonOut_({
+    ok: true,
+    found: true,
+    slug: slug,
+    url: String(hit.url || (PUBLIC_SITE_BASE + slug)),
+    salonName: String(hit.name || '')
+  });
+}
+
+/* ------------------------------------------------------------
+   Signup core — shared by {type:'signup'} and {type:'signupSite'}.
+   De-dupe guard: same email within 10 minutes is treated as a
+   double-submit and acknowledged without a second row/email.
+   Returns {id, deduped}.
+   ------------------------------------------------------------ */
+function signupCore_(body, now) {
+  var sh = sheet_(TABS.SIGNUPS);
+  var email = String(body.email || '').trim().toLowerCase();
+
+  var TEN_MIN = 10 * 60 * 1000;
+  var existing = readTab_(TABS.SIGNUPS);
+  for (var i = existing.length - 1; i >= 0; i--) {
+    var r = existing[i];
+    if (String(r.email || '').trim().toLowerCase() === email && email !== '') {
+      var ts = new Date(r.ts);
+      if (!isNaN(ts.getTime()) && (now.getTime() - ts.getTime()) < TEN_MIN) {
+        return { id: r.id, deduped: true };
+      }
+    }
+  }
+
+  var id = 'su_' + now.getTime() + '_' + Math.floor(Math.random() * 10000);
+  appendByHeaders_(sh, {
+    id: id,
+    ts: now.toISOString(),
+    salon: String(body.salon || ''),
+    name: String(body.name || ''),
+    email: String(body.email || ''),
+    phone: String(body.phone || ''),
+    website: String(body.website || ''),
+    plan: String(body.plan || ''),
+    status: 'new',
+    salonId: String(body.salonId || ''),
+    actor: String(body.actor || 'public-form')
+  });
+
+  notifyOwnersOfSignup_(body, id, now);
+  return { id: id, deduped: false };
+}
+
+/* ------------------------------------------------------------
+   {type:'signup'} — v1 INSERT from the marketing-site form.
+   Extra wizard fields (theme/accent/tagline/slug) are accepted
+   and simply appended into the owner email so nothing is lost
+   when the client falls back to a plain signup.
+   ------------------------------------------------------------ */
+function handleSignup_(body) {
+  var lock = LockService.getScriptLock();
+  lock.waitLock(10000);
+  try {
+    var res = signupCore_(body, new Date());
+    return jsonOut_({ ok: true, id: res.id, deduped: res.deduped || undefined });
+  } finally {
+    lock.releaseLock();
+  }
+}
+
+/* Owner notification email for every new signup. */
+function notifyOwnersOfSignup_(body, id, when) {
+  var subject = 'New SalonVine trial signup — ' + String(body.salon || '(no salon name)');
+  var lines = [
+    'A new signup just came in from salonvine.com:',
+    '',
+    'Salon:    ' + (body.salon || '—'),
+    'Contact:  ' + (body.name || '—'),
+    'Email:    ' + (body.email || '—'),
+    'Phone:    ' + (body.phone || '—'),
+    'Website:  ' + (body.website || '—'),
+    'Plan:     ' + (body.plan || '—') + ' (free during early access)',
+    'When:     ' + when.toString(),
+    'ID:       ' + id
+  ];
+  if (body.theme || body.tagline || body.accent) {
+    lines.push('');
+    lines.push('Site preferences from the wizard:');
+    if (body.theme) { lines.push('Theme:    ' + body.theme); }
+    if (body.accent) { lines.push('Accent:   ' + body.accent); }
+    if (body.tagline) { lines.push('Tagline:  ' + body.tagline); }
+    if (body.slug) { lines.push('Slug:     ' + body.slug); }
+  }
+  lines.push('');
+  lines.push('Open the owner portal to follow up: https://portal.salonvine.com');
+  OWNER_NOTIFY.forEach(function (addr) {
+    if (!addr || addr.indexOf('PLACEHOLDER') === 0) { return; }
+    try {
+      MailApp.sendEmail(addr, subject, lines.join('\n'));
+    } catch (err) {
+      console.error('Notify failed for ' + addr + ': ' + err);
+    }
+  });
+}
+
+/* ------------------------------------------------------------
+   {type:'signupSite'} — v2 wizard submit. Does everything
+   {type:'signup'} does PLUS creates the live Salons row.
+   Body: {salon,name,email,phone,website,plan,slug,theme,accent,tagline}
+   Returns {ok, id, slug, url}.
+
+   Retry-safe: if the same email already created a salon in the
+   last 24h (e.g. the visitor hit Retry after a partial failure),
+   the existing slug/url is returned instead of a duplicate site.
+   ------------------------------------------------------------ */
+
+/* v4.1: after any signupSite, tell the multi-tenant app to provision the
+   owner account + send the portal invite. Never allowed to fail a signup. */
+function provisionOwner_(salon, name, email, phone, slug, url) {
+  try {
+    UrlFetchApp.fetch('https://salonvine-app.netlify.app/.netlify/functions/provision-owner', {
+      method: 'post',
+      contentType: 'application/json',
+      muteHttpExceptions: true,
+      payload: JSON.stringify({
+        token: fullToken_(),
+        salon: salon, name: name, email: email, phone: phone,
+        slug: slug, url: url
+      })
+    });
+  } catch (e) { /* best-effort */ }
+}
+
+function handleSignupSite_(body) {
+  var lock = LockService.getScriptLock();
+  lock.waitLock(15000);
+  try {
+    var now = new Date();
+    var email = String(body.email || '').trim().toLowerCase();
+    if (!String(body.salon || '').trim() || !email) {
+      return jsonOut_({ error: 'Need salon and email' });
+    }
+
+    /* retry guard: same email already has a fresh salon? */
+    var DAY = 24 * 60 * 60 * 1000;
+    var salons = readTab_(TABS.SALONS);
+    for (var i = salons.length - 1; i >= 0; i--) {
+      var s = salons[i];
+      var cfg = {};
+      try { cfg = JSON.parse(String(s.config || '{}')); } catch (e1) { cfg = {}; }
+      if (String(cfg.email || '').toLowerCase() === email && s.slug) {
+        var created = new Date(s.createdAt);
+        if (!isNaN(created.getTime()) && (now.getTime() - created.getTime()) < DAY) {
+          signupCore_(body, now); /* still record/dedupe the lead */
+          provisionOwner_(String(body.salon || ''), String(body.name || ''), email, String(body.phone || ''), String(s.slug), String(s.url || (PUBLIC_SITE_BASE + s.slug)));
+          return jsonOut_({ ok: true, id: '', slug: String(s.slug), url: String(s.url || (PUBLIC_SITE_BASE + s.slug)), existing: true });
+        }
+      }
+    }
+
+    /* 1) the lead row + owner email (dedupe-aware) */
+    var su = signupCore_(body, now);
+
+    /* 2) the live salon row */
+    var slug = uniqueSlug_(slugify_(body.slug || body.salon));
+    var url = PUBLIC_SITE_BASE + slug;
+    var salonId = 'sal_' + now.getTime() + '_' + Math.floor(Math.random() * 10000);
+    var config = {
+      email: String(body.email || ''),
+      owner: String(body.name || ''),
+      phone: String(body.phone || ''),
+      signupId: su.id,
+      /* v3: wizard extras — all optional, all sanitized */
+      services: sanitizeServices_(body.services),
+      hours: sanitizeHours_(body.hours),
+      instagram: sanitizeInstagram_(body.instagram)
+    };
+    appendByHeaders_(sheet_(TABS.SALONS), {
+      salonId: salonId,
+      name: String(body.salon || ''),
+      url: url,
+      plan: String(body.plan || ''),
+      status: 'live-free',
+      slug: slug,
+      theme: String(body.theme || 'classic-cream'),
+      accent: String(body.accent || ''),
+      tagline: String(body.tagline || ''),
+      photos: '[]',
+      config: JSON.stringify(config),
+      createdAt: now.toISOString()
+    });
+
+    provisionOwner_(String(body.salon || ''), String(body.name || ''), email, String(body.phone || ''), slug, url);
+    return jsonOut_({ ok: true, id: su.id, slug: slug, url: url });
+  } finally {
+    lock.releaseLock();
+  }
+}
+
+/* ------------------------------------------------------------
+   {type:'sitePhoto'} — v2. Body {slug, n, data: base64 dataURL}.
+   Saves to Drive "SalonVine Sites/<slug>/", shares
+   anyone-with-link, appends the lh3 URL to the salon's photos.
+   ------------------------------------------------------------ */
+function handleSitePhoto_(body) {
+  var slug = String(body.slug || '').trim().toLowerCase();
+  var data = String(body.data || '');
+  var n = Number(body.n) || 0;
+
+  if (!slug || !data) { return jsonOut_({ error: 'Need slug and data' }); }
+  if (data.length > MAX_PHOTO_POST_CHARS) { return jsonOut_({ error: 'Photo too large' }); }
+  var m = data.match(/^data:(image\/(?:jpeg|jpg|png|webp));base64,(.+)$/);
+  if (!m) { return jsonOut_({ error: 'Expected a base64 image dataURL' }); }
+
+  var lock = LockService.getScriptLock();
+  lock.waitLock(20000);
+  try {
+    var found = findSalonRow_(slug);
+    if (!found) { return jsonOut_({ error: 'Unknown site: ' + slug }); }
+
+    var photos = [];
+    try { photos = JSON.parse(salonCell_(found, 'photos') || '[]'); } catch (e1) { photos = []; }
+    if (!Array.isArray(photos)) { photos = []; }
+    if (photos.length >= MAX_PHOTOS_PER_SALON) {
+      return jsonOut_({ error: 'Photo limit reached (' + MAX_PHOTOS_PER_SALON + ')' });
+    }
+
+    var contentType = m[1] === 'image/jpg' ? 'image/jpeg' : m[1];
+    var bytes;
+    try {
+      bytes = Utilities.base64Decode(m[2]);
+    } catch (e2) {
+      return jsonOut_({ error: 'Bad base64 data' });
+    }
+    var ext = contentType === 'image/png' ? 'png' : (contentType === 'image/webp' ? 'webp' : 'jpg');
+    var blob = Utilities.newBlob(bytes, contentType, slug + '-' + (n || photos.length + 1) + '.' + ext);
+
+    var folder = getOrCreateFolder_(getOrCreateRootFolder_(), slug);
+    var file = folder.createFile(blob);
+    try {
+      file.setSharing(DriveApp.Access.ANYONE_WITH_LINK, DriveApp.Permission.VIEW);
+    } catch (e3) {
+      console.error('setSharing failed for ' + slug + ': ' + e3);
+    }
+
+    var url = 'https://lh3.googleusercontent.com/d/' + file.getId() + '=w1600';
+    photos.push(url);
+    var col = found.cols.photos;
+    if (col) { found.sheet.getRange(found.rowNum, col).setValue(JSON.stringify(photos)); }
+
+    return jsonOut_({ ok: true, url: url, count: photos.length });
+  } finally {
+    lock.releaseLock();
+  }
+}
+
+function getOrCreateRootFolder_() {
+  var it = DriveApp.getFoldersByName(DRIVE_ROOT_FOLDER);
+  return it.hasNext() ? it.next() : DriveApp.createFolder(DRIVE_ROOT_FOLDER);
+}
+
+function getOrCreateFolder_(parent, name) {
+  var it = parent.getFoldersByName(name);
+  return it.hasNext() ? it.next() : parent.createFolder(name);
+}
+
+/* ------------------------------------------------------------
+   {type:'siteLead'} — v2 booking request from a live salon site.
+   Body {slug, name, phone, email, message}. Stored to SiteLeads
+   + emailed to the salon's signup email AND the owners.
+   De-dupe: same email+slug within 5 minutes.
+   ------------------------------------------------------------ */
+function handleSiteLead_(body) {
+  var slug = String(body.slug || '').trim().toLowerCase();
+  var name = String(body.name || '').trim();
+  var phone = String(body.phone || '').trim();
+  var email = String(body.email || '').trim();
+  var message = String(body.message || '').trim();
+  if (!slug) { return jsonOut_({ error: 'Need slug' }); }
+  if (!name || (!phone && !email)) {
+    return jsonOut_({ error: 'Need a name and a phone or email' });
+  }
+
+  var lock = LockService.getScriptLock();
+  lock.waitLock(10000);
+  try {
+    var now = new Date();
+
+    /* de-dupe: same email + slug in the last 5 minutes */
+    var FIVE_MIN = 5 * 60 * 1000;
+    var emailLc = email.toLowerCase();
+    if (emailLc) {
+      var existing = readTab_(TABS.SITELEADS);
+      for (var i = existing.length - 1; i >= 0; i--) {
+        var r = existing[i];
+        if (String(r.slug || '') === slug && String(r.email || '').toLowerCase() === emailLc) {
+          var ts = new Date(r.ts);
+          if (!isNaN(ts.getTime()) && (now.getTime() - ts.getTime()) < FIVE_MIN) {
+            return jsonOut_({ ok: true, deduped: true });
+          }
+        }
+      }
+    }
+
+    appendByHeaders_(sheet_(TABS.SITELEADS), {
+      ts: now.toISOString(),
+      slug: slug,
+      name: name,
+      phone: phone,
+      email: email,
+      message: message
+    });
+
+    /* find the salon + its owner email */
+    var found = findSalonRow_(slug);
+    var salonName = found ? (salonCell_(found, 'name') || slug) : slug;
+    var ownerEmail = '';
+    if (found) {
+      try {
+        var cfg = JSON.parse(salonCell_(found, 'config') || '{}');
+        ownerEmail = String(cfg.email || '');
+      } catch (e1) { ownerEmail = ''; }
+    }
+
+    var subject = 'New booking request — ' + salonName;
+    var lines = [
+      'Someone just requested an appointment on your Salon Vine site:',
+      '',
+      'Salon:    ' + salonName + ' (' + PUBLIC_SITE_BASE + slug + ')',
+      'Name:     ' + (name || '—'),
+      'Phone:    ' + (phone || '—'),
+      'Email:    ' + (email || '—'),
+      'Message:  ' + (message || '—'),
+      'When:     ' + now.toString(),
+      '',
+      'Reply directly to the client to book them in.'
+    ];
+    var recipients = [];
+    if (ownerEmail) { recipients.push(ownerEmail); }
+    OWNER_NOTIFY.forEach(function (a) { if (recipients.indexOf(a) === -1) { recipients.push(a); } });
+    recipients.forEach(function (addr) {
+      if (!addr || addr.indexOf('PLACEHOLDER') === 0) { return; }
+      try {
+        MailApp.sendEmail(addr, subject, lines.join('\n'));
+      } catch (err) {
+        console.error('Lead notify failed for ' + addr + ': ' + err);
+      }
+    });
+
+    return jsonOut_({ ok: true });
+  } finally {
+    lock.releaseLock();
+  }
+}
+
+/* ------------------------------------------------------------
+   {type:'signupStatus', id, status} — v1, unchanged.
+   ------------------------------------------------------------ */
+function handleSignupStatus_(body) {
+  var VALID = ['new', 'contacted', 'converted', 'lost'];
+  var id = String(body.id || '');
+  var status = String(body.status || '');
+  if (!id || VALID.indexOf(status) === -1) {
+    return jsonOut_({ error: 'Need id and a valid status (' + VALID.join('/') + ')' });
+  }
+  var sh = sheet_(TABS.SIGNUPS);
+  var values = sh.getDataRange().getValues();
+  var head = values[0].map(String);
+  var idCol = head.indexOf('id');
+  var statusCol = head.indexOf('status');
+  for (var r = 1; r < values.length; r++) {
+    if (String(values[r][idCol]) === id) {
+      sh.getRange(r + 1, statusCol + 1).setValue(status);
+      return jsonOut_({ ok: true, id: id, status: status });
+    }
+  }
+  return jsonOut_({ error: 'Signup not found: ' + id });
+}
+
+/* ------------------------------------------------------------
+   {type:'salon', salonId, ...} — v1 upsert, now header-driven so
+   it works with the extended Salons columns too.
+   ------------------------------------------------------------ */
+function handleSalonUpsert_(body) {
+  var salonId = String(body.salonId || '');
+  if (!salonId) { return jsonOut_({ error: 'Need salonId' }); }
+  var sh = sheet_(TABS.SALONS);
+  var cols = headerCols_(sh);
+  var values = sh.getDataRange().getValues();
+  var idCol = cols.salonId;
+  if (!idCol) { return jsonOut_({ error: 'Salons tab missing salonId header — run setup()' }); }
+  for (var r = 1; r < values.length; r++) {
+    if (String(values[r][idCol - 1]) === salonId) {
+      /* update: only overwrite provided fields */
+      HEADERS.Salons.forEach(function (h) {
+        if (body[h] !== undefined && cols[h]) {
+          sh.getRange(r + 1, cols[h]).setValue(String(body[h]));
+        }
+      });
+      return jsonOut_({ ok: true, salonId: salonId, updated: true });
+    }
+  }
+  var obj = {};
+  HEADERS.Salons.forEach(function (h) { obj[h] = String(body[h] || ''); });
+  appendByHeaders_(sh, obj);
+  return jsonOut_({ ok: true, salonId: salonId, created: true });
+}
+
+/* ============================================================
+   v4 OWNER EDIT/DELETE handlers (merged from parent session)
    ============================================================ */
 function audit_(body, type, ref, fields) {
   try {
@@ -781,454 +1448,4 @@ function handleRevenueDelete_(body) {
   } finally {
     lock.releaseLock();
   }
-}
-
-/* ------------------------------------------------------------
-   {type:'salonConfig', slug, patch:{...}} — v3, FULL token only
-   (gated in doPost above). Shallow-merges the patch into the
-   salon's config JSON blob. services / hours / instagram are
-   sanitized; other keys are stored as short strings so the
-   owner portal / future editor can extend config without a
-   backend release. signupId is protected.
-   ------------------------------------------------------------ */
-function handleSalonConfig_(body) {
-  var slug = String(body.slug || '').trim().toLowerCase();
-  var patch = (body.patch && typeof body.patch === 'object' && !Array.isArray(body.patch)) ? body.patch : null;
-  if (!slug || !patch) { return jsonOut_({ error: 'Need slug and patch object' }); }
-
-  var lock = LockService.getScriptLock();
-  lock.waitLock(10000);
-  try {
-    var found = findSalonRow_(slug);
-    if (!found) { return jsonOut_({ error: 'Unknown site: ' + slug }); }
-    if (!found.cols.config) { return jsonOut_({ error: 'Salons tab missing config header — run setup()' }); }
-
-    var cfg = {};
-    try { cfg = JSON.parse(salonCell_(found, 'config') || '{}'); } catch (e1) { cfg = {}; }
-    if (!cfg || typeof cfg !== 'object') { cfg = {}; }
-
-    Object.keys(patch).forEach(function (k) {
-      if (k === 'signupId') { return; } /* provenance is immutable */
-      if (k === 'services') { cfg.services = sanitizeServices_(patch.services); return; }
-      if (k === 'hours') { cfg.hours = sanitizeHours_(patch.hours); return; }
-      if (k === 'instagram') { cfg.instagram = sanitizeInstagram_(patch.instagram); return; }
-      if (patch[k] === null) { delete cfg[k]; return; } /* null deletes a key */
-      cfg[k] = String(patch[k]).slice(0, 500);
-    });
-
-    found.sheet.getRange(found.rowNum, found.cols.config).setValue(JSON.stringify(cfg));
-    return jsonOut_({ ok: true, slug: slug, config: cfg });
-  } finally {
-    lock.releaseLock();
-  }
-}
-
-/* ------------------------------------------------------------
-   {type:'findSite', email} — light-token lookup used by the
-   marketing site's "Find your salon" (login) page. Returns the
-   newest LIVE instant site whose signup email matches. Only
-   reveals slug/url/name — nothing else.
-   ------------------------------------------------------------ */
-function handleFindSite_(body) {
-  var email = String(body.email || '').trim().toLowerCase();
-  if (!email) { return jsonOut_({ ok: true, found: false }); }
-
-  var salons = readTab_(TABS.SALONS);
-  var hit = null;
-  for (var i = 0; i < salons.length; i++) {
-    var sal = salons[i];
-    var status = String(sal.status || '').toLowerCase();
-    if (status !== 'live-free' && status !== 'live') { continue; }
-    var cfg = {};
-    try { cfg = JSON.parse(String(sal.config || '{}')); } catch (e) { cfg = {}; }
-    if (String(cfg.email || '').trim().toLowerCase() === email) {
-      hit = sal; /* keep last (newest) match */
-    }
-  }
-
-  if (!hit) { return jsonOut_({ ok: true, found: false }); }
-  var slug = String(hit.slug || hit.salonId || '');
-  return jsonOut_({
-    ok: true,
-    found: true,
-    slug: slug,
-    url: String(hit.url || (PUBLIC_SITE_BASE + slug)),
-    salonName: String(hit.name || '')
-  });
-}
-
-/* ------------------------------------------------------------
-   Signup core — shared by {type:'signup'} and {type:'signupSite'}.
-   De-dupe guard: same email within 10 minutes is treated as a
-   double-submit and acknowledged without a second row/email.
-   Returns {id, deduped}.
-   ------------------------------------------------------------ */
-function signupCore_(body, now) {
-  var sh = sheet_(TABS.SIGNUPS);
-  var email = String(body.email || '').trim().toLowerCase();
-
-  var TEN_MIN = 10 * 60 * 1000;
-  var existing = readTab_(TABS.SIGNUPS);
-  for (var i = existing.length - 1; i >= 0; i--) {
-    var r = existing[i];
-    if (String(r.email || '').trim().toLowerCase() === email && email !== '') {
-      var ts = new Date(r.ts);
-      if (!isNaN(ts.getTime()) && (now.getTime() - ts.getTime()) < TEN_MIN) {
-        return { id: r.id, deduped: true };
-      }
-    }
-  }
-
-  var id = 'su_' + now.getTime() + '_' + Math.floor(Math.random() * 10000);
-  appendByHeaders_(sh, {
-    id: id,
-    ts: now.toISOString(),
-    salon: String(body.salon || ''),
-    name: String(body.name || ''),
-    email: String(body.email || ''),
-    phone: String(body.phone || ''),
-    website: String(body.website || ''),
-    plan: String(body.plan || ''),
-    status: 'new',
-    salonId: String(body.salonId || ''),
-    actor: String(body.actor || 'public-form')
-  });
-
-  notifyOwnersOfSignup_(body, id, now);
-  return { id: id, deduped: false };
-}
-
-/* ------------------------------------------------------------
-   {type:'signup'} — v1 INSERT from the marketing-site form.
-   Extra wizard fields (theme/accent/tagline/slug) are accepted
-   and simply appended into the owner email so nothing is lost
-   when the client falls back to a plain signup.
-   ------------------------------------------------------------ */
-function handleSignup_(body) {
-  var lock = LockService.getScriptLock();
-  lock.waitLock(10000);
-  try {
-    var res = signupCore_(body, new Date());
-    return jsonOut_({ ok: true, id: res.id, deduped: res.deduped || undefined });
-  } finally {
-    lock.releaseLock();
-  }
-}
-
-/* Owner notification email for every new signup. */
-function notifyOwnersOfSignup_(body, id, when) {
-  var subject = 'New SalonVine trial signup — ' + String(body.salon || '(no salon name)');
-  var lines = [
-    'A new signup just came in from salonvine.com:',
-    '',
-    'Salon:    ' + (body.salon || '—'),
-    'Contact:  ' + (body.name || '—'),
-    'Email:    ' + (body.email || '—'),
-    'Phone:    ' + (body.phone || '—'),
-    'Website:  ' + (body.website || '—'),
-    'Plan:     ' + (body.plan || '—') + ' (free during early access)',
-    'When:     ' + when.toString(),
-    'ID:       ' + id
-  ];
-  if (body.theme || body.tagline || body.accent) {
-    lines.push('');
-    lines.push('Site preferences from the wizard:');
-    if (body.theme) { lines.push('Theme:    ' + body.theme); }
-    if (body.accent) { lines.push('Accent:   ' + body.accent); }
-    if (body.tagline) { lines.push('Tagline:  ' + body.tagline); }
-    if (body.slug) { lines.push('Slug:     ' + body.slug); }
-  }
-  lines.push('');
-  lines.push('Open the owner portal to follow up: https://portal.salonvine.com');
-  OWNER_NOTIFY.forEach(function (addr) {
-    if (!addr || addr.indexOf('PLACEHOLDER') === 0) { return; }
-    try {
-      MailApp.sendEmail(addr, subject, lines.join('\n'));
-    } catch (err) {
-      console.error('Notify failed for ' + addr + ': ' + err);
-    }
-  });
-}
-
-/* ------------------------------------------------------------
-   {type:'signupSite'} — v2 wizard submit. Does everything
-   {type:'signup'} does PLUS creates the live Salons row.
-   Body: {salon,name,email,phone,website,plan,slug,theme,accent,tagline}
-   Returns {ok, id, slug, url}.
-
-   Retry-safe: if the same email already created a salon in the
-   last 24h (e.g. the visitor hit Retry after a partial failure),
-   the existing slug/url is returned instead of a duplicate site.
-   ------------------------------------------------------------ */
-function handleSignupSite_(body) {
-  var lock = LockService.getScriptLock();
-  lock.waitLock(15000);
-  try {
-    var now = new Date();
-    var email = String(body.email || '').trim().toLowerCase();
-    if (!String(body.salon || '').trim() || !email) {
-      return jsonOut_({ error: 'Need salon and email' });
-    }
-
-    /* retry guard: same email already has a fresh salon? */
-    var DAY = 24 * 60 * 60 * 1000;
-    var salons = readTab_(TABS.SALONS);
-    for (var i = salons.length - 1; i >= 0; i--) {
-      var s = salons[i];
-      var cfg = {};
-      try { cfg = JSON.parse(String(s.config || '{}')); } catch (e1) { cfg = {}; }
-      if (String(cfg.email || '').toLowerCase() === email && s.slug) {
-        var created = new Date(s.createdAt);
-        if (!isNaN(created.getTime()) && (now.getTime() - created.getTime()) < DAY) {
-          signupCore_(body, now); /* still record/dedupe the lead */
-          return jsonOut_({ ok: true, id: '', slug: String(s.slug), url: String(s.url || (PUBLIC_SITE_BASE + s.slug)), existing: true });
-        }
-      }
-    }
-
-    /* 1) the lead row + owner email (dedupe-aware) */
-    var su = signupCore_(body, now);
-
-    /* 2) the live salon row */
-    var slug = uniqueSlug_(slugify_(body.slug || body.salon));
-    var url = PUBLIC_SITE_BASE + slug;
-    var salonId = 'sal_' + now.getTime() + '_' + Math.floor(Math.random() * 10000);
-    var config = {
-      email: String(body.email || ''),
-      owner: String(body.name || ''),
-      phone: String(body.phone || ''),
-      signupId: su.id,
-      /* v3: wizard extras — all optional, all sanitized */
-      services: sanitizeServices_(body.services),
-      hours: sanitizeHours_(body.hours),
-      instagram: sanitizeInstagram_(body.instagram)
-    };
-    appendByHeaders_(sheet_(TABS.SALONS), {
-      salonId: salonId,
-      name: String(body.salon || ''),
-      url: url,
-      plan: String(body.plan || ''),
-      status: 'live-free',
-      slug: slug,
-      theme: String(body.theme || 'classic-cream'),
-      accent: String(body.accent || ''),
-      tagline: String(body.tagline || ''),
-      photos: '[]',
-      config: JSON.stringify(config),
-      createdAt: now.toISOString()
-    });
-
-    return jsonOut_({ ok: true, id: su.id, slug: slug, url: url });
-  } finally {
-    lock.releaseLock();
-  }
-}
-
-/* ------------------------------------------------------------
-   {type:'sitePhoto'} — v2. Body {slug, n, data: base64 dataURL}.
-   Saves to Drive "SalonVine Sites/<slug>/", shares
-   anyone-with-link, appends the lh3 URL to the salon's photos.
-   ------------------------------------------------------------ */
-function handleSitePhoto_(body) {
-  var slug = String(body.slug || '').trim().toLowerCase();
-  var data = String(body.data || '');
-  var n = Number(body.n) || 0;
-
-  if (!slug || !data) { return jsonOut_({ error: 'Need slug and data' }); }
-  if (data.length > MAX_PHOTO_POST_CHARS) { return jsonOut_({ error: 'Photo too large' }); }
-  var m = data.match(/^data:(image\/(?:jpeg|jpg|png|webp));base64,(.+)$/);
-  if (!m) { return jsonOut_({ error: 'Expected a base64 image dataURL' }); }
-
-  var lock = LockService.getScriptLock();
-  lock.waitLock(20000);
-  try {
-    var found = findSalonRow_(slug);
-    if (!found) { return jsonOut_({ error: 'Unknown site: ' + slug }); }
-
-    var photos = [];
-    try { photos = JSON.parse(salonCell_(found, 'photos') || '[]'); } catch (e1) { photos = []; }
-    if (!Array.isArray(photos)) { photos = []; }
-    if (photos.length >= MAX_PHOTOS_PER_SALON) {
-      return jsonOut_({ error: 'Photo limit reached (' + MAX_PHOTOS_PER_SALON + ')' });
-    }
-
-    var contentType = m[1] === 'image/jpg' ? 'image/jpeg' : m[1];
-    var bytes;
-    try {
-      bytes = Utilities.base64Decode(m[2]);
-    } catch (e2) {
-      return jsonOut_({ error: 'Bad base64 data' });
-    }
-    var ext = contentType === 'image/png' ? 'png' : (contentType === 'image/webp' ? 'webp' : 'jpg');
-    var blob = Utilities.newBlob(bytes, contentType, slug + '-' + (n || photos.length + 1) + '.' + ext);
-
-    var folder = getOrCreateFolder_(getOrCreateRootFolder_(), slug);
-    var file = folder.createFile(blob);
-    try {
-      file.setSharing(DriveApp.Access.ANYONE_WITH_LINK, DriveApp.Permission.VIEW);
-    } catch (e3) {
-      console.error('setSharing failed for ' + slug + ': ' + e3);
-    }
-
-    var url = 'https://lh3.googleusercontent.com/d/' + file.getId() + '=w1600';
-    photos.push(url);
-    var col = found.cols.photos;
-    if (col) { found.sheet.getRange(found.rowNum, col).setValue(JSON.stringify(photos)); }
-
-    return jsonOut_({ ok: true, url: url, count: photos.length });
-  } finally {
-    lock.releaseLock();
-  }
-}
-
-function getOrCreateRootFolder_() {
-  var it = DriveApp.getFoldersByName(DRIVE_ROOT_FOLDER);
-  return it.hasNext() ? it.next() : DriveApp.createFolder(DRIVE_ROOT_FOLDER);
-}
-
-function getOrCreateFolder_(parent, name) {
-  var it = parent.getFoldersByName(name);
-  return it.hasNext() ? it.next() : parent.createFolder(name);
-}
-
-/* ------------------------------------------------------------
-   {type:'siteLead'} — v2 booking request from a live salon site.
-   Body {slug, name, phone, email, message}. Stored to SiteLeads
-   + emailed to the salon's signup email AND the owners.
-   De-dupe: same email+slug within 5 minutes.
-   ------------------------------------------------------------ */
-function handleSiteLead_(body) {
-  var slug = String(body.slug || '').trim().toLowerCase();
-  var name = String(body.name || '').trim();
-  var phone = String(body.phone || '').trim();
-  var email = String(body.email || '').trim();
-  var message = String(body.message || '').trim();
-  if (!slug) { return jsonOut_({ error: 'Need slug' }); }
-  if (!name || (!phone && !email)) {
-    return jsonOut_({ error: 'Need a name and a phone or email' });
-  }
-
-  var lock = LockService.getScriptLock();
-  lock.waitLock(10000);
-  try {
-    var now = new Date();
-
-    /* de-dupe: same email + slug in the last 5 minutes */
-    var FIVE_MIN = 5 * 60 * 1000;
-    var emailLc = email.toLowerCase();
-    if (emailLc) {
-      var existing = readTab_(TABS.SITELEADS);
-      for (var i = existing.length - 1; i >= 0; i--) {
-        var r = existing[i];
-        if (String(r.slug || '') === slug && String(r.email || '').toLowerCase() === emailLc) {
-          var ts = new Date(r.ts);
-          if (!isNaN(ts.getTime()) && (now.getTime() - ts.getTime()) < FIVE_MIN) {
-            return jsonOut_({ ok: true, deduped: true });
-          }
-        }
-      }
-    }
-
-    appendByHeaders_(sheet_(TABS.SITELEADS), {
-      ts: now.toISOString(),
-      slug: slug,
-      name: name,
-      phone: phone,
-      email: email,
-      message: message
-    });
-
-    /* find the salon + its owner email */
-    var found = findSalonRow_(slug);
-    var salonName = found ? (salonCell_(found, 'name') || slug) : slug;
-    var ownerEmail = '';
-    if (found) {
-      try {
-        var cfg = JSON.parse(salonCell_(found, 'config') || '{}');
-        ownerEmail = String(cfg.email || '');
-      } catch (e1) { ownerEmail = ''; }
-    }
-
-    var subject = 'New booking request — ' + salonName;
-    var lines = [
-      'Someone just requested an appointment on your Salon Vine site:',
-      '',
-      'Salon:    ' + salonName + ' (' + PUBLIC_SITE_BASE + slug + ')',
-      'Name:     ' + (name || '—'),
-      'Phone:    ' + (phone || '—'),
-      'Email:    ' + (email || '—'),
-      'Message:  ' + (message || '—'),
-      'When:     ' + now.toString(),
-      '',
-      'Reply directly to the client to book them in.'
-    ];
-    var recipients = [];
-    if (ownerEmail) { recipients.push(ownerEmail); }
-    OWNER_NOTIFY.forEach(function (a) { if (recipients.indexOf(a) === -1) { recipients.push(a); } });
-    recipients.forEach(function (addr) {
-      if (!addr || addr.indexOf('PLACEHOLDER') === 0) { return; }
-      try {
-        MailApp.sendEmail(addr, subject, lines.join('\n'));
-      } catch (err) {
-        console.error('Lead notify failed for ' + addr + ': ' + err);
-      }
-    });
-
-    return jsonOut_({ ok: true });
-  } finally {
-    lock.releaseLock();
-  }
-}
-
-/* ------------------------------------------------------------
-   {type:'signupStatus', id, status} — v1, unchanged.
-   ------------------------------------------------------------ */
-function handleSignupStatus_(body) {
-  var VALID = ['new', 'contacted', 'converted', 'lost'];
-  var id = String(body.id || '');
-  var status = String(body.status || '');
-  if (!id || VALID.indexOf(status) === -1) {
-    return jsonOut_({ error: 'Need id and a valid status (' + VALID.join('/') + ')' });
-  }
-  var sh = sheet_(TABS.SIGNUPS);
-  var values = sh.getDataRange().getValues();
-  var head = values[0].map(String);
-  var idCol = head.indexOf('id');
-  var statusCol = head.indexOf('status');
-  for (var r = 1; r < values.length; r++) {
-    if (String(values[r][idCol]) === id) {
-      sh.getRange(r + 1, statusCol + 1).setValue(status);
-      return jsonOut_({ ok: true, id: id, status: status });
-    }
-  }
-  return jsonOut_({ error: 'Signup not found: ' + id });
-}
-
-/* ------------------------------------------------------------
-   {type:'salon', salonId, ...} — v1 upsert, now header-driven so
-   it works with the extended Salons columns too.
-   ------------------------------------------------------------ */
-function handleSalonUpsert_(body) {
-  var salonId = String(body.salonId || '');
-  if (!salonId) { return jsonOut_({ error: 'Need salonId' }); }
-  var sh = sheet_(TABS.SALONS);
-  var cols = headerCols_(sh);
-  var values = sh.getDataRange().getValues();
-  var idCol = cols.salonId;
-  if (!idCol) { return jsonOut_({ error: 'Salons tab missing salonId header — run setup()' }); }
-  for (var r = 1; r < values.length; r++) {
-    if (String(values[r][idCol - 1]) === salonId) {
-      /* update: only overwrite provided fields */
-      HEADERS.Salons.forEach(function (h) {
-        if (body[h] !== undefined && cols[h]) {
-          sh.getRange(r + 1, cols[h]).setValue(String(body[h]));
-        }
-      });
-      return jsonOut_({ ok: true, salonId: salonId, updated: true });
-    }
-  }
-  var obj = {};
-  HEADERS.Salons.forEach(function (h) { obj[h] = String(body[h] || ''); });
-  appendByHeaders_(sh, obj);
-  return jsonOut_({ ok: true, salonId: salonId, created: true });
 }
