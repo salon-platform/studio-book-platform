@@ -17,6 +17,18 @@
   to = "/login.html"
   status = 200
 
+# Pretty client URLs: <name>.salonvine.com serves that salon's site.
+# site.html reads the slug from the hostname (subdomainSlug) and the
+# backend matches it hyphen-insensitively, so no query string is
+# needed. force=true because index.html exists at "/" and would
+# otherwise shadow the rewrite. One rule per named salon until the
+# wildcard-DNS project lands.
+[[redirects]]
+  from = "https://calicuts.salonvine.com/"
+  to = "/site.html"
+  status = 200
+  force = true
+
 # Instant salon sites: /s/<slug> served by the universal renderer.
 # status=200 = rewrite; :splat carries the slug. MUST stay above the catch-all.
 [[redirects]]

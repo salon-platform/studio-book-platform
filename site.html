@@ -307,7 +307,16 @@ var THEMES = {
   'ocean':         {label:'Ocean',         mode:'light', bg:'#f2f7f9', bg2:'#e2edf1', surface:'#ffffff', ink:'#1f2d33', soft:'#54676f', accent:'#3e7d92'}
 };
 
-/* ---------------- slug from ?s= or /s/<slug> path ---------------- */
+/* ---------------- slug from ?s=, /s/<slug> path, or subdomain ---------------- */
+/* v6.1: pretty client URLs — calicuts.salonvine.com serves the
+   cali-cuts site. The backend matches subdomains hyphen-insensitively
+   and returns the canonical slug, so bookings still post correctly. */
+var RESERVED_SUBDOMAINS = ['www', 'portal', 'app', 'mail', 'api', 'admin'];
+function subdomainSlug() {
+  var m = window.location.hostname.toLowerCase().match(/^([a-z0-9-]+)\.salonvine\.com$/);
+  if (!m) { return ''; }
+  return RESERVED_SUBDOMAINS.indexOf(m[1]) === -1 ? m[1] : '';
+}
 function currentSlug() {
   var q = new URLSearchParams(window.location.search);
   var s = (q.get('s') || q.get('site') || '').trim();
@@ -315,6 +324,7 @@ function currentSlug() {
     var m = window.location.pathname.match(/\/s\/([a-z0-9-]+)\/?$/i);
     if (m) { s = m[1]; }
   }
+  if (!s) { s = subdomainSlug(); }
   return s.toLowerCase().replace(/[^a-z0-9-]/g, '').replace(/\/+$/, '');
 }
 
