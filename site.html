@@ -88,6 +88,7 @@ header.top{position:sticky;top:0;z-index:40;background:color-mix(in srgb,var(--b
 .visit-item svg{width:18px;height:18px;color:var(--accent);flex-shrink:0}
 .visit-item a{color:var(--accent);font-weight:600}
 .visit-item a:hover{text-decoration:underline}
+#visitLinks{gap:6px}
 
 /* sticky mobile "Request appointment" bar (v2) */
 #stickyBook{display:none}
@@ -217,6 +218,7 @@ footer .powered a:hover{text-decoration:underline}
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" aria-hidden="true"><rect x="3" y="3" width="18" height="18" rx="5"/><circle cx="12" cy="12" r="4"/><circle cx="17.2" cy="6.8" r="1" fill="currentColor" stroke="none"/></svg>
           <a id="visitInstaLink" target="_blank" rel="noopener"></a>
         </span>
+        <span class="visit-item" id="visitLinks" style="display:none"></span>
       </div>
       <div class="contact-card reveal" id="contact">
         <form id="leadForm" novalidate>
@@ -294,6 +296,12 @@ footer .powered a:hover{text-decoration:underline}
 var SV_EXEC = window.SV_EXEC_OVERRIDE ||
   'https://script.google.com/macros/s/AKfycbyXCmFCL-HuLEFvZDTsV9fIrYiaRCW06ZuNl1uYR-4DhgaJpmthlUKaAIr8rtau2_g4/exec';
 var SV_LEAD_PROXY = 'https://salonvine-app.netlify.app/.netlify/functions/site-lead-proxy';
+
+/* The registry's public site endpoint returns a fixed set of fields. Anything
+   the owner adds from the portal that isn't in that set — their About text,
+   their other social profiles, their show/hide choices — comes from here.
+   It is a separate, optional call: if it fails the page still renders. */
+var SV_EXTRA = 'https://salonvine-app.netlify.app/.netlify/functions/site-extra';
 var SV_DEPOSIT = 'https://salonvine-app.netlify.app/.netlify/functions/booking-deposit';
 var SV_DEPOSIT_CONFIRM = 'https://salonvine-app.netlify.app/.netlify/functions/deposit-confirm';
 
@@ -358,7 +366,9 @@ function applyTheme(themeKey, accentOverride) {
 /* ---------------- render ---------------- */
 var SITE = null;
 
-function render(cfg) {
+function render(cfg, extra) {
+  extra = extra || {};
+  function flag(k) { return extra[k] === undefined ? true : !!extra[k]; }
   SITE = cfg;
   applyTheme(cfg.theme, cfg.accent);
 
@@ -404,7 +414,7 @@ function render(cfg) {
   var photos = Array.isArray(cfg.photos) ? cfg.photos.filter(function (u) {
     return /^https?:\/\//.test(String(u));
   }) : [];
-  if (photos.length) {
+  if (photos.length && flag('showGallery')) {
     var g = document.getElementById('gallery');
     g.innerHTML = photos.map(function (u, i) {
       return '<button type="button" class="shot" data-idx="' + i + '" aria-label="View photo ' + (i + 1) + ' full screen">' +
@@ -416,9 +426,22 @@ function render(cfg) {
 
   /* about */
   document.getElementById('aboutHead').textContent = 'A little about us';
-  document.getElementById('aboutText').textContent =
-    name + ' is an independent salon that cares about the details — great work, honest advice, ' +
-    'and appointments that run on time. ' + (cfg.tagline ? '' : 'Come sit in the chair and see for yourself.');
+  var aboutEl = document.getElementById('aboutText');
+  var ownAbout = String(extra.about || '').trim();
+  if (ownAbout) {
+    /* Their own words, with paragraph breaks kept. textContent per line so
+       nothing they type can inject markup. */
+    aboutEl.textContent = '';
+    ownAbout.split(/\n\s*\n/).forEach(function (para, i) {
+      var p = i === 0 ? aboutEl : document.createElement('p');
+      p.textContent = para.replace(/\s*\n\s*/g, ' ').trim();
+      if (i > 0) { aboutEl.parentNode.insertBefore(p, aboutEl.nextSibling); }
+    });
+  } else {
+    aboutEl.textContent =
+      name + ' is an independent salon that cares about the details — great work, honest advice, ' +
+      'and appointments that run on time. ' + (cfg.tagline ? '' : 'Come sit in the chair and see for yourself.');
+  }
 
   /* v2: services & prices — rendered from config.services, hidden if empty */
   var services = (Array.isArray(cfg.services) ? cfg.services : []).filter(function (s) {
@@ -428,7 +451,8 @@ function render(cfg) {
   if (services.length) {
     body.innerHTML = '<div class="svc-card" style="text-align:left"><ul class="svc-list">' +
       services.map(function (s) {
-        return '<li><span>' + esc(s.name || '') + '</span><span class="price">' + esc(s.price || '') + '</span></li>';
+        var pr = flag('servicesVisual') ? esc(s.price || '') : '';
+        return '<li><span>' + esc(s.name || '') + '</span><span class="price">' + pr + '</span></li>';
       }).join('') + '</ul></div>';
     document.getElementById('servicesSection').style.display = 'block';
   } else {
@@ -444,7 +468,7 @@ function render(cfg) {
   if (services.length) {
     svcSel.innerHTML = '<option value="">Choose a service&hellip;</option>' +
       services.map(function (x) {
-        var label = x.name + (x.price ? ' — ' + x.price : '');
+        var label = x.name + ((x.price && flag('servicesVisual')) ? ' — ' + x.price : '');
         return '<option value="' + esc(x.name) + '">' + esc(label) + '</option>';
       }).join('') + '<option value="__other">Something else / not sure</option>';
     document.getElementById('lfService').style.display = 'block';
@@ -454,7 +478,7 @@ function render(cfg) {
   var team = (Array.isArray(cfg.stylists) ? cfg.stylists : []).filter(function (n) {
     return String(n || '').trim();
   });
-  if (team.length) {
+  if (team.length && flag('showTeam')) {
     var stySel = document.getElementById('leadStylist');
     stySel.innerHTML = '<option value="">No preference</option>' +
       team.map(function (n) { return '<option value="' + esc(n) + '">' + esc(n) + '</option>'; }).join('');
@@ -495,7 +519,37 @@ function render(cfg) {
     il.href = 'https://instagram.com/' + encodeURIComponent(insta);
     document.getElementById('visitInsta').style.display = 'flex';
   }
-  if (hours || insta) { document.getElementById('visitRow').style.display = 'flex'; }
+  /* Other places they live online. Stored as bare handles, so the URL is
+     built here — that way a stored value can never be a javascript: link. */
+  var SOCIAL = [
+    { k: 'facebook',  label: 'Facebook',  url: function (h) { return 'https://facebook.com/' + encodeURIComponent(h); } },
+    { k: 'twitter',   label: 'X',         url: function (h) { return 'https://x.com/' + encodeURIComponent(h); } },
+    { k: 'pinterest', label: 'Pinterest', url: function (h) { return 'https://pinterest.com/' + encodeURIComponent(h); } },
+    { k: 'yelp',      label: 'Yelp',      url: function (h) { return 'https://yelp.com/biz/' + encodeURIComponent(h); } }
+  ];
+  var links = [];
+  SOCIAL.forEach(function (sn) {
+    var h = String(extra[sn.k] || '').trim();
+    if (h) { links.push({ href: sn.url(h), text: sn.label }); }
+  });
+  var ext = String(extra.externalWebsite || '').trim();
+  if (/^https?:\/\//i.test(ext)) {
+    links.push({ href: ext, text: ext.replace(/^https?:\/\/(www\.)?/i, '').replace(/\/+$/, '') });
+  }
+  if (links.length) {
+    var box = document.getElementById('visitLinks');
+    box.textContent = '';
+    links.forEach(function (l, i) {
+      if (i) { box.appendChild(document.createTextNode(' · ')); }
+      var a = document.createElement('a');
+      a.href = l.href; a.target = '_blank'; a.rel = 'noopener';
+      a.textContent = l.text;
+      box.appendChild(a);
+    });
+    box.style.display = 'inline-flex';
+  }
+
+  if (hours || insta || links.length) { document.getElementById('visitRow').style.display = 'flex'; }
 
   /* v2: sticky mobile booking bar — appears after the hero, hides
      while the booking form itself is on screen */
@@ -614,13 +668,22 @@ function showNotFound() {
 (function load() {
   var slug = currentSlug();
   if (!slug) { showNotFound(); return; }
-  fetch(SV_EXEC + '?site=' + encodeURIComponent(slug))
+  /* Both at once. The extras call resolves to {} on any failure so a hiccup
+     there can never blank a salon's page. */
+  var main = fetch(SV_EXEC + '?site=' + encodeURIComponent(slug))
     .then(function (res) {
       if (!res.ok) { throw new Error('HTTP ' + res.status); }
       return res.json();
-    })
-    .then(function (cfg) {
-      if (cfg && cfg.ok && cfg.name) { render(cfg); }
+    });
+  var side = fetch(SV_EXTRA + '?slug=' + encodeURIComponent(slug))
+    .then(function (res) { return res.ok ? res.json() : null; })
+    .then(function (j) { return (j && j.extra) || {}; })
+    .catch(function () { return {}; });
+
+  Promise.all([main, side])
+    .then(function (r) {
+      var cfg = r[0];
+      if (cfg && cfg.ok && cfg.name) { render(cfg, r[1]); }
       else { showNotFound(); }
     })
     .catch(function () {
