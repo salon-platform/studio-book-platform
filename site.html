@@ -55,15 +55,39 @@ header.top{position:sticky;top:0;z-index:40;background:color-mix(in srgb,var(--b
 .hero{padding:96px 0 84px;text-align:center;position:relative;overflow:hidden}
 .hero:before{content:"";position:absolute;inset:auto -20% -60% -20%;height:130%;background:radial-gradient(ellipse at 50% 100%,color-mix(in srgb,var(--accent) 14%,transparent),transparent 65%);pointer-events:none}
 /* v6.3: owner-uploaded hero background (portal editor). The image
-   sits behind a dark overlay so the heading always stays readable. */
-.hero.has-img{background-size:cover;background-position:center;color:#fff;padding:130px 0 110px}
-.hero.has-img:before{inset:0;height:auto;background:linear-gradient(rgba(12,10,9,.55),rgba(12,10,9,.62))}
+   sits behind a dark overlay so the heading always stays readable.
+   v7: every salon gets a hero image — the owner's own upload when they
+   have one, otherwise a curated stock shot matched to their theme. The
+   image lives on its own layer (.hero-bg) so it can drift slowly
+   (Ken Burns) without moving the text. */
+.hero.has-img{color:#fff;padding:138px 0 118px}
+.hero-bg{position:absolute;inset:-4%;background-size:cover;background-position:center;z-index:0;display:none}
+.hero.has-img .hero-bg{display:block;animation:kenburns 26s ease-in-out infinite alternate}
+@keyframes kenburns{from{transform:scale(1) translate(0,0)}to{transform:scale(1.09) translate(-1.2%,1%)}}
+.hero.has-img:before{inset:0;height:auto;background:linear-gradient(rgba(12,10,9,.5),rgba(12,10,9,.64));z-index:1}
+.hero.has-img .container{z-index:2}
 .hero.has-img h1,.hero.has-img .tagline{color:#fff}
+.hero.has-img .tagline{opacity:.94}
 .hero.has-img .eyebrow{color:#f3e8dc}
-.hero .eyebrow{letter-spacing:.26em;text-transform:uppercase;font-size:.74rem;color:var(--accent);margin-bottom:20px;font-weight:600}
-.hero h1{font-size:clamp(2.5rem,7vw,4rem);line-height:1.08;max-width:820px;margin:0 auto 18px}
+.hero .eyebrow{letter-spacing:.26em;text-transform:uppercase;font-size:.74rem;color:var(--accent);margin-bottom:20px;font-weight:600;display:flex;align-items:center;justify-content:center;gap:14px}
+.hero .eyebrow:before,.hero .eyebrow:after{content:"";width:34px;height:1px;background:currentColor;opacity:.55}
+.hero h1{font-size:clamp(2.6rem,7vw,4.2rem);line-height:1.06;max-width:860px;margin:0 auto 18px;text-shadow:0 1px 24px rgba(0,0,0,.12)}
 .hero .tagline{font-family:var(--serif);font-style:italic;font-size:clamp(1.05rem,2.6vw,1.35rem);color:var(--soft);max-width:640px;margin:0 auto 38px}
-.hero .rule{width:56px;height:2px;background:var(--accent);margin:0 auto 30px}
+.hero .rule{width:56px;height:2px;margin:0 auto 30px;background:linear-gradient(90deg,var(--accent),color-mix(in srgb,var(--accent) 40%,#fff),var(--accent));background-size:200% 100%;animation:sheen 5.5s ease-in-out infinite}
+@keyframes sheen{0%,100%{background-position:0% 0}50%{background-position:100% 0}}
+/* hero content walks in on load: eyebrow, name, rule, tagline, button */
+.hero .container>*{opacity:0;transform:translateY(16px);animation:heroin .8s ease forwards}
+.hero .container>*:nth-child(1){animation-delay:.05s}
+.hero .container>*:nth-child(2){animation-delay:.18s}
+.hero .container>*:nth-child(3){animation-delay:.34s}
+.hero .container>*:nth-child(4){animation-delay:.46s}
+.hero .container>*:nth-child(5){animation-delay:.58s}
+@keyframes heroin{to{opacity:1;transform:none}}
+@media (prefers-reduced-motion:reduce){
+  .hero.has-img .hero-bg{animation:none}
+  .hero .rule{animation:none}
+  .hero .container>*{opacity:1;transform:none;animation:none}
+}
 
 .section{padding:78px 0}
 .section-label{color:var(--accent);letter-spacing:.22em;text-transform:uppercase;font-size:.72rem;text-align:center;display:block;margin-bottom:10px;font-weight:600}
@@ -117,9 +141,28 @@ header.top{position:sticky;top:0;z-index:40;background:color-mix(in srgb,var(--b
 }
 @media (prefers-reduced-motion:reduce){#stickyBook{transition:none}}
 
-/* about */
+/* about — v7: split layout with imagery, like a designed template rather
+   than a floating paragraph. The photo is decorative (curated stock by
+   theme); the salon's own words stay the focus. */
+.about-split{display:grid;grid-template-columns:5fr 6fr;gap:52px;align-items:center;max-width:960px;margin:0 auto}
+.about-media{position:relative}
+.about-media img{width:100%;aspect-ratio:4/5;object-fit:cover;border-radius:14px;box-shadow:0 24px 60px -28px rgba(0,0,0,.35)}
+.about-media:after{content:"";position:absolute;inset:14px -14px -14px 14px;border:1px solid var(--accent);border-radius:14px;opacity:.45;pointer-events:none;z-index:-1}
+.about-copy .section-label{text-align:left}
+.about-copy h2{text-align:left}
+.about-copy p{color:var(--soft);font-size:1.02rem}
+@media(max-width:760px){
+  .about-split{grid-template-columns:1fr;gap:34px;max-width:560px}
+  .about-media img{aspect-ratio:16/10}
+  .about-copy .section-label,.about-copy h2{text-align:center}
+  .about-copy p{text-align:center}
+}
 .about-inner{max-width:640px;margin:0 auto;text-align:center}
 .about-inner p{color:var(--soft);font-size:1.02rem}
+/* ornament divider under section headings */
+.orn{display:flex;align-items:center;justify-content:center;gap:10px;color:var(--accent);margin:2px 0 14px}
+.orn:before,.orn:after{content:"";width:44px;height:1px;background:currentColor;opacity:.5}
+.orn svg{width:15px;height:15px}
 
 /* services */
 .services{max-width:620px;margin:0 auto}
@@ -187,6 +230,7 @@ footer .powered a:hover{text-decoration:underline}
   </header>
 
   <section class="hero" id="heroSection">
+    <div class="hero-bg" id="heroBg" aria-hidden="true"></div>
     <div class="container" style="position:relative">
       <div class="eyebrow">Welcome to</div>
       <h1 id="heroName"></h1>
@@ -206,10 +250,18 @@ footer .powered a:hover{text-decoration:underline}
   </section>
 
   <section class="section" id="aboutSection">
-    <div class="container about-inner reveal">
-      <span class="section-label">About</span>
-      <h2 id="aboutHead"></h2>
-      <p id="aboutText"></p>
+    <div class="container">
+      <div class="about-split reveal">
+        <div class="about-media" id="aboutMedia">
+          <img id="aboutImg" src="" alt="" loading="lazy">
+        </div>
+        <div class="about-copy">
+          <span class="section-label">About</span>
+          <h2 id="aboutHead"></h2>
+          <div class="orn" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><circle cx="6" cy="6" r="2.6"/><circle cx="6" cy="18" r="2.6"/><path d="M8.2 7.6 20 19M8.2 16.4 20 5" stroke-linecap="round"/></svg></div>
+          <p id="aboutText"></p>
+        </div>
+      </div>
     </div>
   </section>
 
@@ -332,6 +384,19 @@ var THEMES = {
   'ocean':         {label:'Ocean',         mode:'light', bg:'#f2f7f9', bg2:'#e2edf1', surface:'#ffffff', ink:'#1f2d33', soft:'#54676f', accent:'#3e7d92'}
 };
 
+/* v7: curated stock imagery (assets/stock, Unsplash-licensed) so every
+   site looks designed from second one — template-style, like Google
+   Sites. The owner's own hero upload always wins over the stock hero. */
+var STOCK_BASE = '/assets/stock/';
+var THEME_STOCK = {
+  'classic-cream': {hero:'stock-hero-bright.jpg', about:'stock-cutting.jpg'},
+  'midnight':      {hero:'stock-stools.jpg',      about:'stock-style.jpg'},
+  'rose-gold':     {hero:'stock-hero-bright.jpg', about:'stock-blowout.jpg'},
+  'sage-spa':      {hero:'stock-welcome.jpg',     about:'stock-mirror.jpg'},
+  'bold-noir':     {hero:'stock-barber-cut.jpg',  about:'stock-hero-barber.jpg'},
+  'ocean':         {hero:'stock-hero-bright.jpg', about:'stock-team.jpg'}
+};
+
 /* ---------------- slug from ?s=, /s/<slug> path, or subdomain ---------------- */
 /* v6.1: pretty client URLs — calicuts.salonvine.com serves the
    cali-cuts site. The backend matches subdomains hyphen-insensitively
@@ -429,11 +494,18 @@ function render(cfg, extra) {
     lg.alt = name + ' logo';
     lg.style.display = 'inline-block';
   }
+  /* v7: hero background — the owner's upload when they have one, a
+     theme-matched stock shot otherwise. Every salon opens with a real
+     image now; "bland by default" is over. */
+  var stock = THEME_STOCK[cfg.theme] || THEME_STOCK['classic-cream'];
+  var heroUrl = '';
   if (cfg.heroImage && /^https:\/\/lh3\.googleusercontent\.com\//.test(String(cfg.heroImage))) {
-    var hs = document.getElementById('heroSection');
-    hs.classList.add('has-img');
-    hs.style.backgroundImage = 'url("' + String(cfg.heroImage).replace(/"/g, '') + '")';
+    heroUrl = String(cfg.heroImage).replace(/"/g, '');
+  } else {
+    heroUrl = STOCK_BASE + stock.hero;
   }
+  document.getElementById('heroSection').classList.add('has-img');
+  document.getElementById('heroBg').style.backgroundImage = 'url("' + heroUrl + '")';
 
   if (cfg.tagline) {
     var tg = document.getElementById('heroTagline');
@@ -455,7 +527,10 @@ function render(cfg, extra) {
     initLightbox(photos, name);
   }
 
-  /* about */
+  /* about — v7: split layout with a decorative theme-matched photo */
+  var aImg = document.getElementById('aboutImg');
+  aImg.src = STOCK_BASE + stock.about;
+  aImg.alt = '';
   document.getElementById('aboutHead').textContent = 'A little about us';
   var aboutEl = document.getElementById('aboutText');
   var ownAbout = String(extra.about || '').trim();
