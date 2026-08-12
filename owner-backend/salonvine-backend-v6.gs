@@ -413,6 +413,27 @@ function findSalonRow_(slug) {
   return null;
 }
 
+/* v6.1: hyphen-insensitive slug lookup for subdomain URLs.
+   'calicuts' matches stored slug 'cali-cuts' — but ONLY when exactly
+   one stored slug compacts to the requested form. Ambiguity -> null. */
+function findSalonRowCompact_(slugRaw) {
+  var want = String(slugRaw || '').toLowerCase().replace(/-/g, '');
+  if (!want) { return null; }
+  var sh = sheet_(TABS.SALONS);
+  var cols = headerCols_(sh);
+  if (!cols.slug) { return null; }
+  var values = sh.getDataRange().getValues();
+  var hit = null, hits = 0;
+  for (var r = 1; r < values.length; r++) {
+    var stored = String(values[r][cols.slug - 1]).trim().toLowerCase();
+    if (stored && stored.replace(/-/g, '') === want) {
+      hits++;
+      hit = { sheet: sh, rowNum: r + 1, cols: cols, row: values[r] };
+    }
+  }
+  return hits === 1 ? hit : null;
+}
+
 function salonCell_(found, header) {
   var c = found.cols[header];
   return c ? String(found.row[c - 1]) : '';
@@ -523,6 +544,11 @@ function publicSiteConfig_(slugRaw) {
   var found;
   try {
     found = findSalonRow_(slug);
+    /* v6.1: subdomain URLs drop the hyphen (calicuts.salonvine.com
+       -> slug 'cali-cuts'), so if the exact slug misses, retry
+       hyphen-insensitively. Only a UNIQUE match counts — an
+       ambiguous compact form stays 'not found' rather than guessing. */
+    if (!found) { found = findSalonRowCompact_(slug); }
   } catch (err) {
     return jsonOut_({ error: 'not found' });
   }
@@ -547,10 +573,12 @@ function publicSiteConfig_(slugRaw) {
   var cfg = {};
   try { cfg = JSON.parse(salonCell_(found, 'config') || '{}'); } catch (e3) { cfg = {}; }
 
-  /* ONLY public fields — no plan, no status, no email, no phone */
+  /* ONLY public fields — no plan, no status, no email, no phone.
+     v6.1: return the CANONICAL stored slug (not the raw input) so a
+     subdomain visitor's bookings post against the real row. */
   return jsonOut_({
     ok: true,
-    slug: slug,
+    slug: String(salonCell_(found, 'slug') || slug),
     name: salonCell_(found, 'name'),
     tagline: salonCell_(found, 'tagline'),
     theme: salonCell_(found, 'theme'),
