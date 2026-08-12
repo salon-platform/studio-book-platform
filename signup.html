@@ -129,6 +129,16 @@
 .sum-thumbs img{width:30px;height:30px;object-fit:cover;border-radius:4px}
 .sum-url{font-family:ui-monospace,Menlo,monospace;font-size:.82rem;background:var(--cream2);padding:3px 8px;border-radius:5px;word-break:break-all}
 .go-fineprint{font-size:.78rem;color:var(--ink-soft);text-align:center;margin-top:16px}
+/* promo code (step 4) */
+.promo-box{border:1px solid var(--line);border-radius:10px;background:var(--cream2);padding:14px 16px;margin:0 0 20px}
+.promo-label{font-size:.85rem;font-weight:600;color:var(--ink);display:block;margin-bottom:8px}
+.promo-row{display:flex;gap:8px}
+.promo-row input{flex:1;min-width:0;padding:11px 12px;border:1.5px solid var(--line);border-radius:8px;font-family:var(--sans);font-size:.95rem;background:#fff;text-transform:uppercase}
+.promo-row .btn{white-space:nowrap;padding:11px 18px}
+.promo-msg{font-size:.82rem;margin:10px 0 0;font-weight:600}
+.promo-msg.ok{color:var(--good)}
+.promo-msg.bad{color:#b3462e}
+.comped-banner{border:1px solid var(--good);background:rgba(111,143,116,.12);color:var(--accent-dark);border-radius:10px;padding:12px 16px;margin:6px auto 16px;max-width:420px;font-size:.92rem;font-weight:600}
 .go-fineprint a{text-decoration:underline}
 
 /* progress + result panels */
@@ -316,11 +326,20 @@
 
       <div class="sum-table" id="sumTable"></div>
 
+      <div class="promo-box">
+        <label for="promoCode" class="promo-label">Have a promo code?</label>
+        <div class="promo-row">
+          <input type="text" id="promoCode" maxlength="40" autocomplete="off" spellcheck="false" placeholder="Enter code (optional)">
+          <button type="button" class="btn btn-outline" id="promoApply">Apply</button>
+        </div>
+        <p class="promo-msg" id="promoMsg" style="display:none"></p>
+      </div>
+
       <div class="wiz-nav">
         <button type="button" class="wiz-back" data-back="3">&larr; Back</button>
         <button type="button" class="btn btn-accent" id="createBtn" style="font-size:.95rem;padding:17px 28px">Create my site</button>
       </div>
-      <p class="go-fineprint">Your site goes live free. Next you’ll start a 30-day free trial — cancel before day 31 and you’re never charged. By continuing you agree to Salon Vine's <a href="terms.html">Terms of Service</a> and <a href="privacy.html">Privacy Policy</a>.</p>
+      <p class="go-fineprint" id="goFineprint">Your site goes live free. Next you’ll start a 30-day free trial — cancel before day 31 and you’re never charged. By continuing you agree to Salon Vine's <a href="terms.html">Terms of Service</a> and <a href="privacy.html">Privacy Policy</a>.</p>
     </section>
 
     <!-- ================= PROGRESS ================= -->
@@ -415,7 +434,9 @@ var state = {
   accentManual: false,      /* has the user picked an accent explicitly? */
   photos: [],               /* [{dataUrl, kb, status:'pending'|'uploading'|'done'|'failed'}] */
   leadSaved: false,         /* fallback plain signup already succeeded? */
-  siteResult: null          /* {slug,url} once signupSite succeeds */
+  siteResult: null,         /* {slug,url} once signupSite succeeds */
+  promo: '',                /* validated comp code (uppercased) or '' */
+  promoInfo: null           /* {code,kind,label} once a valid code is applied */
 };
 var MAX_PHOTOS = 6;
 
@@ -774,9 +795,49 @@ function basePayload() {
     /* v2: optional extras — ride along on signupSite AND the plain-signup fallback */
     services: getServices(),
     hours: document.getElementById('hours').value.trim(),
-    instagram: document.getElementById('instagram').value.trim().replace(/^@+/, '')
+    instagram: document.getElementById('instagram').value.trim().replace(/^@+/, ''),
+    promo: state.promo
   };
 }
+
+/* ---------------- promo code (step 4) ---------------- */
+function setPromoMsg(text, cls) {
+  var el = document.getElementById('promoMsg');
+  if (!text) { el.style.display = 'none'; el.textContent = ''; el.className = 'promo-msg'; return; }
+  el.textContent = text;
+  el.className = 'promo-msg ' + (cls || '');
+  el.style.display = 'block';
+}
+function applyPromo() {
+  var input = document.getElementById('promoCode');
+  var code = input.value.trim();
+  if (!code) { state.promo = ''; state.promoInfo = null; setPromoMsg('', ''); return; }
+  var btn = document.getElementById('promoApply');
+  btn.disabled = true;
+  setPromoMsg('Checking…', '');
+  postFn('promo-check', { code: code }).then(function (data) {
+    if (data && data.valid && data.promo) {
+      state.promo = String(data.promo.code || code).toUpperCase();
+      state.promoInfo = data.promo;
+      var free = data.promo.kind === 'comp';
+      setPromoMsg('✓ ' + (data.promo.label || 'Code applied') + (free ? ' — your site is free, no card needed.' : ''), 'ok');
+    } else {
+      state.promo = ''; state.promoInfo = null;
+      setPromoMsg('That code isn’t valid. You can still go live free and start your trial.', 'bad');
+    }
+  }).catch(function () {
+    state.promo = ''; state.promoInfo = null;
+    setPromoMsg('Couldn’t check that code right now — try again in a moment.', 'bad');
+  }).then(function () { btn.disabled = false; });
+}
+document.getElementById('promoApply').addEventListener('click', applyPromo);
+document.getElementById('promoCode').addEventListener('keydown', function (e) {
+  if (e.key === 'Enter') { e.preventDefault(); applyPromo(); }
+});
+/* re-validate on the summary step in case they typed then edited */
+document.getElementById('promoCode').addEventListener('blur', function () {
+  if (this.value.trim() && this.value.trim().toUpperCase() !== state.promo) { applyPromo(); }
+});
 
 /* ---------------- submit flow ---------------- */
 var progItems = [];
@@ -825,7 +886,7 @@ function submitAll() {
         if (!data || !data.ok || !data.slug) {
           throw new Error((data && data.error) || 'Unexpected response from server');
         }
-        return { slug: data.slug, url: data.url || (SITE_BASE + data.slug) };
+        return { slug: data.slug, url: data.url || (SITE_BASE + data.slug), comped: !!data.comped, promo: data.promo || '' };
       });
 
   sitePromise.then(function (site) {
@@ -923,6 +984,31 @@ function showSuccess(site, uploaded) {
   } else {
     note.style.display = 'none';
   }
+
+  /* v6: comped (promo) salons are free forever — no card, no trial.
+     Swap the trial push for a "you're comped" message and hide the
+     trial step + CTA so we never ask a comped client for a card. */
+  var comped = !!(site && site.comped);
+  var trialBtn = document.getElementById('startTrialBtn');
+  var trialStep = document.querySelector('#nextSteps li');   /* first item = trial */
+  var existingBanner = document.getElementById('compedBanner');
+  if (existingBanner) { existingBanner.parentNode.removeChild(existingBanner); }
+  if (comped) {
+    var card = document.querySelector('.success-card');
+    var banner = document.createElement('div');
+    banner.id = 'compedBanner';
+    banner.className = 'comped-banner';
+    banner.textContent = '🎉 You’re all set — ' + (site.promo || 'your code') +
+      ' makes ' + salon + ' free, forever. No card needed, nothing to pay.';
+    var liveLinkEl = document.getElementById('liveLink');
+    card.insertBefore(banner, liveLinkEl.nextSibling);
+    if (trialBtn) { trialBtn.style.display = 'none'; }
+    if (trialStep) { trialStep.style.display = 'none'; }
+  } else {
+    if (trialBtn) { trialBtn.style.display = ''; }
+    if (trialStep) { trialStep.style.display = ''; }
+  }
+
   showPanel('panelSuccess');
   confetti();
 }
