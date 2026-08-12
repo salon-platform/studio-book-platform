@@ -45,12 +45,21 @@ img{max-width:100%;display:block}
 #site{display:none}
 header.top{position:sticky;top:0;z-index:40;background:color-mix(in srgb,var(--bg) 88%,transparent);backdrop-filter:blur(8px);border-bottom:1px solid var(--line)}
 .topnav{display:flex;align-items:center;justify-content:space-between;max-width:1040px;margin:0 auto;padding:16px 22px}
-.topnav .salon-brand{font-family:var(--serif);font-size:1.25rem;letter-spacing:.01em}
+.topnav .salon-brand{font-family:var(--serif);font-size:1.25rem;letter-spacing:.01em;display:flex;align-items:center;gap:12px}
 .topnav .salon-brand em{color:var(--accent);font-style:normal}
+/* v6.3: owner-uploaded logo in the header (portal editor) */
+.topnav .salon-logo{height:38px;max-width:170px;object-fit:contain;border-radius:6px;display:none}
+@media(max-width:520px){.topnav .salon-logo{height:30px;max-width:120px}}
 .topnav .btn{padding:11px 20px}
 
 .hero{padding:96px 0 84px;text-align:center;position:relative;overflow:hidden}
 .hero:before{content:"";position:absolute;inset:auto -20% -60% -20%;height:130%;background:radial-gradient(ellipse at 50% 100%,color-mix(in srgb,var(--accent) 14%,transparent),transparent 65%);pointer-events:none}
+/* v6.3: owner-uploaded hero background (portal editor). The image
+   sits behind a dark overlay so the heading always stays readable. */
+.hero.has-img{background-size:cover;background-position:center;color:#fff;padding:130px 0 110px}
+.hero.has-img:before{inset:0;height:auto;background:linear-gradient(rgba(12,10,9,.55),rgba(12,10,9,.62))}
+.hero.has-img h1,.hero.has-img .tagline{color:#fff}
+.hero.has-img .eyebrow{color:#f3e8dc}
 .hero .eyebrow{letter-spacing:.26em;text-transform:uppercase;font-size:.74rem;color:var(--accent);margin-bottom:20px;font-weight:600}
 .hero h1{font-size:clamp(2.5rem,7vw,4rem);line-height:1.08;max-width:820px;margin:0 auto 18px}
 .hero .tagline{font-family:var(--serif);font-style:italic;font-size:clamp(1.05rem,2.6vw,1.35rem);color:var(--soft);max-width:640px;margin:0 auto 38px}
@@ -64,8 +73,16 @@ header.top{position:sticky;top:0;z-index:40;background:color-mix(in srgb,var(--b
 /* gallery */
 #gallerySection{background:var(--bg2)}
 .gallery{display:grid;grid-template-columns:repeat(3,1fr);gap:14px}
-@media(max-width:720px){.gallery{grid-template-columns:repeat(2,1fr)}}
-@media(max-width:440px){.gallery{grid-template-columns:1fr}}
+/* v6.3: no blank cells — an orphan last row stretches to fill it.
+   A lone last shot goes full-width; two-in-a-row makes the second
+   span the remaining space. */
+.gallery .shot:last-child:nth-child(3n+1){grid-column:1/-1;aspect-ratio:16/7}
+.gallery .shot:last-child:nth-child(3n+2){grid-column:span 2;aspect-ratio:16/7.5}
+@media(max-width:720px){.gallery{grid-template-columns:repeat(2,1fr)}
+  .gallery .shot:last-child:nth-child(3n+1),.gallery .shot:last-child:nth-child(3n+2){grid-column:auto;aspect-ratio:4/3}
+  .gallery .shot:last-child:nth-child(odd){grid-column:1/-1;aspect-ratio:16/8}}
+@media(max-width:440px){.gallery{grid-template-columns:1fr}
+  .gallery .shot:last-child:nth-child(odd){grid-column:auto;aspect-ratio:4/3}}
 .gallery .shot{aspect-ratio:4/3;border-radius:10px;overflow:hidden;background:var(--surface);border:1px solid var(--line);cursor:zoom-in;padding:0}
 .gallery .shot img{width:100%;height:100%;object-fit:cover;transition:transform .5s ease}
 .gallery .shot:hover img{transform:scale(1.04)}
@@ -164,12 +181,12 @@ footer .powered a:hover{text-decoration:underline}
 <div id="site">
   <header class="top">
     <nav class="topnav">
-      <span class="salon-brand" id="brandName"></span>
+      <span class="salon-brand"><img id="brandLogo" class="salon-logo" alt="" src=""><span id="brandName"></span></span>
       <a href="#contact" class="btn btn-accent">Book now</a>
     </nav>
   </header>
 
-  <section class="hero">
+  <section class="hero" id="heroSection">
     <div class="container" style="position:relative">
       <div class="eyebrow">Welcome to</div>
       <h1 id="heroName"></h1>
@@ -401,8 +418,22 @@ function render(cfg, extra) {
     ? esc(words.slice(0, -1).join(' ')) + ' <em>' + esc(words[words.length - 1]) + '</em>'
     : '<em>' + esc(name) + '</em>';
   document.getElementById('brandName').innerHTML = brandHtml;
-  document.getElementById('heroName').textContent = name;
+  document.getElementById('heroName').textContent = cfg.heroTitle || name;
   document.getElementById('footName').textContent = '© ' + new Date().getFullYear() + ' ' + name;
+
+  /* v6.3: owner-uploaded logo + hero background (portal editor).
+     Only our Drive-hosted URLs ever reach here (server-sanitized). */
+  if (cfg.logo && /^https:\/\/lh3\.googleusercontent\.com\//.test(String(cfg.logo))) {
+    var lg = document.getElementById('brandLogo');
+    lg.src = String(cfg.logo);
+    lg.alt = name + ' logo';
+    lg.style.display = 'inline-block';
+  }
+  if (cfg.heroImage && /^https:\/\/lh3\.googleusercontent\.com\//.test(String(cfg.heroImage))) {
+    var hs = document.getElementById('heroSection');
+    hs.classList.add('has-img');
+    hs.style.backgroundImage = 'url("' + String(cfg.heroImage).replace(/"/g, '') + '")';
+  }
 
   if (cfg.tagline) {
     var tg = document.getElementById('heroTagline');

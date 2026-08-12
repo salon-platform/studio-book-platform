@@ -219,6 +219,17 @@ footer.foot-v2{background:#fff;border-top:1px solid var(--line);padding:56px 24p
 
 section[id]{scroll-margin-top:96px}
 </style>
+<script>
+/* v6.2 fallback: if this page loads on a salon subdomain
+   (<name>.salonvine.com), hand off to the salon renderer. The edge
+   function normally does this before the page is served; this covers
+   any request that slips past it. */
+(function () {
+  var RES = ['www', 'portal', 'app', 'mail', 'api', 'admin', 'salonvine'];
+  var m = location.hostname.toLowerCase().match(/^([a-z0-9-]+)\.salonvine\.com$/);
+  if (m && RES.indexOf(m[1]) === -1) { location.replace('/site.html'); }
+})();
+</script>
 </head>
 <body>
 
