@@ -527,9 +527,15 @@ function render(cfg, extra) {
     initLightbox(photos, name);
   }
 
-  /* about — v7: split layout with a decorative theme-matched photo */
+  /* about — v7: split layout with a decorative theme-matched photo.
+     v7.1: the owner's own About photo (cfg.aboutImage, server-sanitized
+     Drive URL) wins over the stock shot. */
   var aImg = document.getElementById('aboutImg');
-  aImg.src = STOCK_BASE + stock.about;
+  if (cfg.aboutImage && /^https:\/\/lh3\.googleusercontent\.com\//.test(String(cfg.aboutImage))) {
+    aImg.src = String(cfg.aboutImage);
+  } else {
+    aImg.src = STOCK_BASE + stock.about;
+  }
   aImg.alt = '';
   document.getElementById('aboutHead').textContent = 'A little about us';
   var aboutEl = document.getElementById('aboutText');
