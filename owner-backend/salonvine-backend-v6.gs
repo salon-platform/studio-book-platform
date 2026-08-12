@@ -617,7 +617,8 @@ function publicSiteConfig_(slugRaw) {
     instagram: sanitizeInstagram_(cfg.instagram),
     logo: sanitizeImgUrl_(cfg.logo),
     heroTitle: String(cfg.heroTitle || '').trim().slice(0, 120),
-    heroImage: sanitizeImgUrl_(cfg.heroImage)
+    heroImage: sanitizeImgUrl_(cfg.heroImage),
+    aboutImage: sanitizeImgUrl_(cfg.aboutImage)
   });
 }
 
@@ -1158,9 +1159,11 @@ function handleSitePhoto_(body) {
   /* v6.3: kind 'gallery' (default) appends to the photos array;
      'logo' / 'hero' upload the same way but store the URL in the
      config blob (config.logo / config.heroImage), replacing any
-     previous one — the portal editor uses these. */
+     previous one — the portal editor uses these.
+     v6.4: 'about' — the About-section photo (config.aboutImage),
+     replacing the theme's stock shot on the public site. */
   var kind = String(body.kind || 'gallery').toLowerCase();
-  if (kind !== 'gallery' && kind !== 'logo' && kind !== 'hero') {
+  if (kind !== 'gallery' && kind !== 'logo' && kind !== 'hero' && kind !== 'about') {
     return jsonOut_({ error: 'Unknown photo kind: ' + kind });
   }
 
@@ -1215,7 +1218,9 @@ function handleSitePhoto_(body) {
     var cfg = {};
     try { cfg = JSON.parse(String(found.sheet.getRange(found.rowNum, found.cols.config).getValue() || '{}')); } catch (e4) { cfg = {}; }
     if (!cfg || typeof cfg !== 'object') { cfg = {}; }
-    if (kind === 'logo') { cfg.logo = url; } else { cfg.heroImage = url; }
+    if (kind === 'logo') { cfg.logo = url; }
+    else if (kind === 'about') { cfg.aboutImage = url; }
+    else { cfg.heroImage = url; }
     found.sheet.getRange(found.rowNum, found.cols.config).setValue(JSON.stringify(cfg));
     return jsonOut_({ ok: true, url: url, kind: kind });
   } finally {
@@ -1532,7 +1537,8 @@ function handleSalonEdit_(body) {
     /* 2) config-blob keys (hours / instagram / services + v6.3:
        heroTitle / logo / heroImage for the portal site editor) */
     var touchesConfig = (fields.hours !== undefined || fields.instagram !== undefined || fields.services !== undefined ||
-      fields.heroTitle !== undefined || fields.logo !== undefined || fields.heroImage !== undefined);
+      fields.heroTitle !== undefined || fields.logo !== undefined || fields.heroImage !== undefined ||
+      fields.aboutImage !== undefined);
     if (touchesConfig) {
       if (!cols.config) { return jsonOut_({ error: 'Salons tab missing config header — run setup()' }); }
       var cfg = {};
@@ -1544,6 +1550,7 @@ function handleSalonEdit_(body) {
       if (fields.heroTitle !== undefined) { cfg.heroTitle = String(fields.heroTitle || '').trim().slice(0, 120); }
       if (fields.logo !== undefined) { cfg.logo = sanitizeImgUrl_(fields.logo); }
       if (fields.heroImage !== undefined) { cfg.heroImage = sanitizeImgUrl_(fields.heroImage); }
+      if (fields.aboutImage !== undefined) { cfg.aboutImage = sanitizeImgUrl_(fields.aboutImage); }
       sh.getRange(m.rowNum, cols.config).setValue(JSON.stringify(cfg));
     }
 
