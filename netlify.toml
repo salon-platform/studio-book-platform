@@ -5,6 +5,13 @@
 [functions]
   node_bundler = "esbuild"
 
+# v6.2 wildcard pretty URLs: route the root path through the subdomain
+# router. <name>.salonvine.com/ -> /site.html (salon read from the
+# hostname); reserved hosts + apex pass through to the marketing site.
+[[edge_functions]]
+  path = "/"
+  function = "salon-subdomain"
+
 # V2 pretty URLs used by the homepage CTAs (?salon=/?plan= query
 # strings pass through automatically on 200 rewrites).
 [[redirects]]
