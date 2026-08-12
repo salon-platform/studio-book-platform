@@ -1,0 +1,14 @@
+Curated stock library for SalonVine site defaults.
+Source: Unsplash (unsplash.com/license) - free for commercial use, no attribution required. Credits kept as good practice.
+
+stock-hero-barber.jpg - photo by Guilherme Petri - unsplash.com/photos/PtOfbGkU3uI
+stock-detail-brush.jpg - photo by Adam Winger - unsplash.com/photos/KVVjmb3IIL8
+stock-barber-cut.jpg - photo by Allef Vinicius - unsplash.com/photos/IvQeAVeJULw
+stock-team.jpg - photo by Adam Winger - unsplash.com/photos/fI-TKWjKYls
+stock-blowout.jpg - photo by Adam Winger - unsplash.com/photos/FkAZqQJTbXM
+stock-style.jpg - photo by Adam Winger - unsplash.com/photos/WXmHwPcFamo
+stock-hero-bright.jpg - photo by Brooke Cagle - unsplash.com/photos/9ZygA8BI6_Q
+stock-stools.jpg - photo by Greg Trowman - unsplash.com/photos/jsuWg7IXx1k
+stock-mirror.jpg - photo by Giorgio Trovato - unsplash.com/photos/gI9rvJK61L8
+stock-welcome.jpg - photo by Giorgio Trovato - unsplash.com/photos/OKXwmdbdXkk
+stock-cutting.jpg - photo by Brooke Cagle - unsplash.com/photos/BY77GGxjUTE
