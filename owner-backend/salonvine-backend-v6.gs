@@ -111,6 +111,21 @@
 var OWNER_NOTIFY = ['zackbrockway17@gmail.com', 'halleroffroadllc@gmail.com'];
 
 var PUBLIC_SITE_BASE = 'https://salonvine.com/s/';
+
+/* v6.2: pretty subdomain URLs for new signups. Flip Script Property
+   SV_SUBDOMAIN_URLS to TRUE only AFTER *.salonvine.com wildcard DNS
+   is live on Netlify — until then new signups keep /s/<slug> URLs
+   (which always keep working either way). Subdomain form drops the
+   hyphens (cali-cuts -> calicuts.salonvine.com); the public config
+   lookup matches hyphen-insensitively, so both forms resolve. */
+function subdomainUrlsOn_() {
+  return String(props_().getProperty('SV_SUBDOMAIN_URLS') || '').trim().toUpperCase() === 'TRUE';
+}
+function publicUrlFor_(slug) {
+  var s = String(slug || '');
+  if (subdomainUrlsOn_() && s) { return 'https://' + s.replace(/-/g, '') + '.salonvine.com'; }
+  return PUBLIC_SITE_BASE + s;
+}
 var DRIVE_ROOT_FOLDER = 'SalonVine Sites';
 var MAX_PHOTOS_PER_SALON = 8;
 /* ~6MB of binary is ~8.4M base64 chars (incl. dataURL header slack) */
@@ -481,15 +496,19 @@ function sanitizeHours_(raw) {
 }
 
 function uniqueSlug_(base) {
-  var existing = {};
+  /* v6.2: uniqueness now ALSO covers the hyphen-stripped (subdomain)
+     form, so no two salons ever compact to the same pretty URL —
+     'cali-cuts' taken means 'calicu-ts'/'calicuts' are taken too. */
+  var existing = {}, compact = {};
   readTab_(TABS.SALONS).forEach(function (s) {
     var v = String(s.slug || '').trim();
-    if (v) { existing[v] = true; }
+    if (v) { existing[v] = true; compact[v.replace(/-/g, '')] = true; }
   });
-  if (!existing[base]) { return base; }
+  function taken(c) { return existing[c] || compact[String(c).replace(/-/g, '')]; }
+  if (!taken(base)) { return base; }
   for (var n = 2; n < 1000; n++) {
     var candidate = base + '-' + n;
-    if (!existing[candidate]) { return candidate; }
+    if (!taken(candidate)) { return candidate; }
   }
   return base + '-' + new Date().getTime();
 }
@@ -1075,7 +1094,7 @@ function handleSignupSite_(body) {
 
     /* 2) the live salon row */
     var slug = uniqueSlug_(slugify_(body.slug || body.salon));
-    var url = PUBLIC_SITE_BASE + slug;
+    var url = publicUrlFor_(slug); /* v6.2: subdomain URL when enabled */
     var salonId = 'sal_' + now.getTime() + '_' + Math.floor(Math.random() * 10000);
     var config = {
       email: String(body.email || ''),
