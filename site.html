@@ -136,6 +136,11 @@ footer .powered{margin-top:10px;font-size:.78rem;letter-spacing:.04em}
 footer .powered a{color:var(--accent);font-weight:600}
 footer .powered a:hover{text-decoration:underline}
 
+.field select{width:100%;padding:13px;border:1px solid var(--line);border-radius:6px;font-family:var(--sans);font-size:.95rem;background:var(--bg);color:var(--ink)}
+.field select:focus{outline:2px solid color-mix(in srgb,var(--accent) 55%,transparent);outline-offset:1px;border-color:var(--accent)}
+.field-2up{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+@media(max-width:440px){.field-2up{grid-template-columns:1fr}}
+.field .hint{font-size:.78rem;color:var(--soft);margin-top:5px}
 .reveal{opacity:0;transform:translateY(18px);transition:opacity .6s ease,transform .6s ease}
 .reveal.in{opacity:1;transform:none}
 @media (prefers-reduced-motion:reduce){.reveal{opacity:1;transform:none;transition:none}}
@@ -229,9 +234,28 @@ footer .powered a:hover{text-decoration:underline}
             <input type="email" id="leadEmail" autocomplete="email">
             <div class="field-err">Add a phone number or a valid email so we can reach you.</div>
           </div>
+          <div class="field" id="lfService" style="display:none">
+            <label for="leadService">What are you booking?</label>
+            <select id="leadService"></select>
+          </div>
+          <div class="field" id="lfStylist" style="display:none">
+            <label for="leadStylist">Who would you like?</label>
+            <select id="leadStylist"></select>
+          </div>
+          <div class="field-2up">
+            <div class="field">
+              <label for="leadDate">Preferred date</label>
+              <input type="date" id="leadDate">
+            </div>
+            <div class="field">
+              <label for="leadTime">Preferred time</label>
+              <select id="leadTime"></select>
+            </div>
+          </div>
           <div class="field">
-            <label for="leadMessage">What are you looking for?</label>
-            <textarea id="leadMessage" placeholder="e.g. Balayage + trim, weekday afternoons work best"></textarea>
+            <label for="leadMessage">Anything else? <span style="font-weight:400;text-transform:none">(optional)</span></label>
+            <textarea id="leadMessage" placeholder="e.g. going lighter than last time, and I am tight for time after 4"></textarea>
+            <div class="hint">A date and time here is a request, not a confirmed slot &mdash; the salon will come back to you.</div>
           </div>
           <button type="submit" class="btn btn-accent" id="leadBtn" style="width:100%">Send request</button>
         </form>
@@ -403,6 +427,51 @@ function render(cfg) {
 
   document.getElementById('contactHead').textContent = 'Request an appointment';
 
+  /* Offer the salon's real menu instead of a blank box. A picked service is
+     what makes a request actionable for the owner — before this, every
+     booking arrived as a paragraph of free text with no service and no time. */
+  var svcSel = document.getElementById('leadService');
+  if (services.length) {
+    svcSel.innerHTML = '<option value="">Choose a service&hellip;</option>' +
+      services.map(function (x) {
+        var label = x.name + (x.price ? ' — ' + x.price : '');
+        return '<option value="' + esc(x.name) + '">' + esc(label) + '</option>';
+      }).join('') + '<option value="__other">Something else / not sure</option>';
+    document.getElementById('lfService').style.display = 'block';
+  }
+
+  /* Stylist choice only appears when the salon actually lists people. */
+  var team = (Array.isArray(cfg.stylists) ? cfg.stylists : []).filter(function (n) {
+    return String(n || '').trim();
+  });
+  if (team.length) {
+    var stySel = document.getElementById('leadStylist');
+    stySel.innerHTML = '<option value="">No preference</option>' +
+      team.map(function (n) { return '<option value="' + esc(n) + '">' + esc(n) + '</option>'; }).join('');
+    document.getElementById('lfStylist').style.display = 'block';
+  }
+
+  /* Half-hour slots, 8am–7pm. Deliberately NOT checked against real
+     availability — there is no calendar yet, and showing a time as bookable
+     when nothing holds it is a lie the client only discovers later. */
+  var timeSel = document.getElementById('leadTime');
+  var slots = ['<option value="">Any time</option>'];
+  for (var hh = 8; hh <= 19; hh++) {
+    for (var mm = 0; mm < 60; mm += 30) {
+      var h12 = hh % 12 === 0 ? 12 : hh % 12;
+      var ap = hh < 12 ? 'am' : 'pm';
+      var lab = h12 + ':' + (mm === 0 ? '00' : '30') + ap;
+      slots.push('<option value="' + lab + '">' + lab + '</option>');
+    }
+  }
+  timeSel.innerHTML = slots.join('');
+
+  /* No past dates, nothing beyond 90 days out. */
+  var dEl = document.getElementById('leadDate');
+  var today = new Date();
+  dEl.min = today.toISOString().slice(0, 10);
+  dEl.max = new Date(today.getTime() + 90 * 864e5).toISOString().slice(0, 10);
+
   /* v2: hours + instagram in the contact section */
   var hours = String(cfg.hours || '').trim();
   var insta = String(cfg.instagram || '').replace(/^@+/, '').trim();
@@ -559,6 +628,23 @@ document.getElementById('leadForm').addEventListener('submit', function (e) {
   var phone = document.getElementById('leadPhone').value.trim();
   var email = document.getElementById('leadEmail').value.trim();
   var message = document.getElementById('leadMessage').value.trim();
+  var svcPick = document.getElementById('leadService').value;
+  var service = svcPick === '__other' ? '' : svcPick;
+  var stylist = document.getElementById('leadStylist').value;
+  var dateVal = document.getElementById('leadDate').value;
+  var timeVal = document.getElementById('leadTime').value;
+
+  /* One human-readable string for the portal list, plus the raw parts so a
+     real calendar can use them later without re-parsing English. */
+  var when = '';
+  if (dateVal) {
+    var dp = dateVal.split('-');
+    var dObj = new Date(Number(dp[0]), Number(dp[1]) - 1, Number(dp[2]));
+    when = dObj.toLocaleDateString(undefined, { weekday: 'short', month: 'short', day: 'numeric' });
+    if (timeVal) { when += ' at ' + timeVal; }
+  } else if (timeVal) {
+    when = 'Any day at ' + timeVal;
+  }
 
   var nameBad = !name;
   var reachBad = !phone && !validEmail(email);
@@ -582,7 +668,12 @@ document.getElementById('leadForm').addEventListener('submit', function (e) {
       name: name,
       phone: phone,
       email: email,
-      message: message
+      message: message,
+      service: service,
+      stylist: stylist,
+      when: when,
+      date: dateVal,
+      time: timeVal
     })
   }).then(function (res) {
     if (!res.ok) { throw new Error('HTTP ' + res.status); }
