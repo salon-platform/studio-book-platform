@@ -135,7 +135,14 @@ var MAX_PHOTO_POST_CHARS = 8600000;
 var MAX_MAIL_TEXT_CHARS = 10000;
 var MAX_SMS_TEXT_CHARS = 300;
 var MAX_MAIL_SUBJECT_CHARS = 200;
-var SMS_GATEWAYS = ['vtext.com', 'tmomail.net', 'txt.att.net', 'messaging.sprintpcs.com'];
+/* v6.5: carrier email-to-text gateways are effectively DEAD (AT&T retired
+   txt.att.net, T-Mobile ended tmomail.net, Verizon shut vtext — remaining
+   traffic is silently discarded). They stay only as a zero-cost last resort
+   when Twilio is not configured; Sprint/AT&T dropped entirely so we stop
+   burning sender reputation on dead domains. REAL sms goes through Twilio:
+   set Script Properties TWILIO_SID / TWILIO_AUTH / TWILIO_FROM and every
+   text (receipts, invites, reminders) switches over automatically. */
+var SMS_GATEWAYS = ['vtext.com', 'tmomail.net'];
 
 /* v4 salonStatus whitelist */
 var VALID_SALON_STATUSES = ['live', 'live-free', 'pending', 'suspended', 'cancelled'];
@@ -749,28 +756,73 @@ function handleSendMail_(body) {
     if (!emailOk && !sms) { return jsonOut_({ error: 'Email send failed' }); }
   }
 
-  /* ---- sms leg (carrier gateways) ---- */
+  /* ---- sms leg ----
+     v6.5: Twilio first (real deliverability), gateways only as a free
+     last resort when Twilio credentials are not configured. */
   if (sms) {
     var smsText = text.slice(0, MAX_SMS_TEXT_CHARS);
-    var okCount = 0;
-    SMS_GATEWAYS.forEach(function (gw) {
-      var addr = phone + '@' + gw;
-      var gwOk = true;
-      try {
-        /* blank subject — carriers show subject inline otherwise */
-        MailApp.sendEmail(addr, '', smsText);
-      } catch (errSms) {
-        gwOk = false;
-        console.error('sendMail sms failed for ' + addr + ': ' + errSms);
-      }
-      logMail_(addr, 'sms', '', gwOk);
-      if (gwOk) { okCount++; }
-    });
-    sent.sms = okCount;
-    if (okCount === 0 && !to) { return jsonOut_({ error: 'SMS send failed' }); }
+    var tw = twilioSend_(phone, smsText);
+    if (tw.attempted) {
+      logMail_('+1' + phone, 'sms', 'twilio', tw.ok);
+      sent.sms = tw.ok ? 1 : 0;
+      sent.smsVia = 'twilio';
+      if (!tw.ok && !to) { return jsonOut_({ error: 'SMS send failed (twilio): ' + (tw.error || '') }); }
+    } else {
+      var okCount = 0;
+      SMS_GATEWAYS.forEach(function (gw) {
+        var addr = phone + '@' + gw;
+        var gwOk = true;
+        try {
+          /* blank subject — carriers show subject inline otherwise */
+          MailApp.sendEmail(addr, '', smsText);
+        } catch (errSms) {
+          gwOk = false;
+          console.error('sendMail sms failed for ' + addr + ': ' + errSms);
+        }
+        logMail_(addr, 'sms', 'gateway-besteffort', gwOk);
+        if (gwOk) { okCount++; }
+      });
+      sent.sms = okCount;
+      sent.smsVia = 'gateway';
+      /* Honest signal for callers: gateway "success" only means the email
+         left our account — carriers routinely discard these silently. */
+      sent.smsUnreliable = true;
+      if (okCount === 0 && !to) { return jsonOut_({ error: 'SMS send failed' }); }
+    }
   }
 
   return jsonOut_({ ok: true, sent: sent });
+}
+
+/* v6.5 — Twilio SMS. Configured entirely through Script Properties so no
+   code change is ever needed to turn it on:
+     TWILIO_SID   — Account SID (starts AC…)
+     TWILIO_AUTH  — Auth token
+     TWILIO_FROM  — the Twilio number in E.164, e.g. +19895551234
+   Not configured -> {attempted:false} and the caller falls back. */
+function twilioSend_(phone10, text) {
+  var props = PropertiesService.getScriptProperties();
+  var sid = props.getProperty('TWILIO_SID');
+  var auth = props.getProperty('TWILIO_AUTH');
+  var from = props.getProperty('TWILIO_FROM');
+  if (!sid || !auth || !from) { return { attempted: false }; }
+  try {
+    var resp = UrlFetchApp.fetch('https://api.twilio.com/2010-04-01/Accounts/' + encodeURIComponent(sid) + '/Messages.json', {
+      method: 'post',
+      headers: { Authorization: 'Basic ' + Utilities.base64Encode(sid + ':' + auth) },
+      payload: { To: '+1' + phone10, From: from, Body: text },
+      muteHttpExceptions: true
+    });
+    var code = resp.getResponseCode();
+    if (code >= 200 && code < 300) { return { attempted: true, ok: true }; }
+    var errBody = '';
+    try { errBody = String(JSON.parse(resp.getContentText()).message || '').slice(0, 120); } catch (ep) {}
+    console.error('twilioSend_ failed (' + code + '): ' + errBody);
+    return { attempted: true, ok: false, error: errBody || ('HTTP ' + code) };
+  } catch (e) {
+    console.error('twilioSend_ threw: ' + e);
+    return { attempted: true, ok: false, error: String(e).slice(0, 120) };
+  }
 }
 
 function isValidEmail_(s) {
