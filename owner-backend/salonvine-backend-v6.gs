@@ -273,6 +273,14 @@ function seedPromos_() {
   }
 }
 
+/* v6.3: image URLs settable through edits must be OUR Drive-hosted
+   ones (uploaded via sitePhoto) — never arbitrary external URLs. */
+function sanitizeImgUrl_(v) {
+  var s = String(v || '').trim();
+  if (!s) { return ''; }
+  return /^https:\/\/lh3\.googleusercontent\.com\/d\/[A-Za-z0-9_-]+(=w\d+)?$/.test(s) ? s : '';
+}
+
 function normPromoCode_(c) { return String(c || '').trim().toUpperCase(); }
 function isTrue_(v) { return String(v || '').trim().toUpperCase() === 'TRUE'; }
 
@@ -594,7 +602,8 @@ function publicSiteConfig_(slugRaw) {
 
   /* ONLY public fields — no plan, no status, no email, no phone.
      v6.1: return the CANONICAL stored slug (not the raw input) so a
-     subdomain visitor's bookings post against the real row. */
+     subdomain visitor's bookings post against the real row.
+     v6.3: logo / heroTitle / heroImage for the portal site editor. */
   return jsonOut_({
     ok: true,
     slug: String(salonCell_(found, 'slug') || slug),
@@ -605,7 +614,10 @@ function publicSiteConfig_(slugRaw) {
     photos: photos,
     services: sanitizeServices_(cfg.services),
     hours: sanitizeHours_(cfg.hours),
-    instagram: sanitizeInstagram_(cfg.instagram)
+    instagram: sanitizeInstagram_(cfg.instagram),
+    logo: sanitizeImgUrl_(cfg.logo),
+    heroTitle: String(cfg.heroTitle || '').trim().slice(0, 120),
+    heroImage: sanitizeImgUrl_(cfg.heroImage)
   });
 }
 
@@ -1143,6 +1155,14 @@ function handleSitePhoto_(body) {
   var slug = String(body.slug || '').trim().toLowerCase();
   var data = String(body.data || '');
   var n = Number(body.n) || 0;
+  /* v6.3: kind 'gallery' (default) appends to the photos array;
+     'logo' / 'hero' upload the same way but store the URL in the
+     config blob (config.logo / config.heroImage), replacing any
+     previous one — the portal editor uses these. */
+  var kind = String(body.kind || 'gallery').toLowerCase();
+  if (kind !== 'gallery' && kind !== 'logo' && kind !== 'hero') {
+    return jsonOut_({ error: 'Unknown photo kind: ' + kind });
+  }
 
   if (!slug || !data) { return jsonOut_({ error: 'Need slug and data' }); }
   if (data.length > MAX_PHOTO_POST_CHARS) { return jsonOut_({ error: 'Photo too large' }); }
@@ -1158,7 +1178,7 @@ function handleSitePhoto_(body) {
     var photos = [];
     try { photos = JSON.parse(salonCell_(found, 'photos') || '[]'); } catch (e1) { photos = []; }
     if (!Array.isArray(photos)) { photos = []; }
-    if (photos.length >= MAX_PHOTOS_PER_SALON) {
+    if (kind === 'gallery' && photos.length >= MAX_PHOTOS_PER_SALON) {
       return jsonOut_({ error: 'Photo limit reached (' + MAX_PHOTOS_PER_SALON + ')' });
     }
 
@@ -1170,7 +1190,8 @@ function handleSitePhoto_(body) {
       return jsonOut_({ error: 'Bad base64 data' });
     }
     var ext = contentType === 'image/png' ? 'png' : (contentType === 'image/webp' ? 'webp' : 'jpg');
-    var blob = Utilities.newBlob(bytes, contentType, slug + '-' + (n || photos.length + 1) + '.' + ext);
+    var baseName = kind === 'gallery' ? (slug + '-' + (n || photos.length + 1)) : (slug + '-' + kind);
+    var blob = Utilities.newBlob(bytes, contentType, baseName + '.' + ext);
 
     var folder = getOrCreateFolder_(getOrCreateRootFolder_(), slug);
     var file = folder.createFile(blob);
@@ -1181,11 +1202,22 @@ function handleSitePhoto_(body) {
     }
 
     var url = 'https://lh3.googleusercontent.com/d/' + file.getId() + '=w1600';
-    photos.push(url);
-    var col = found.cols.photos;
-    if (col) { found.sheet.getRange(found.rowNum, col).setValue(JSON.stringify(photos)); }
 
-    return jsonOut_({ ok: true, url: url, count: photos.length });
+    if (kind === 'gallery') {
+      photos.push(url);
+      var col = found.cols.photos;
+      if (col) { found.sheet.getRange(found.rowNum, col).setValue(JSON.stringify(photos)); }
+      return jsonOut_({ ok: true, url: url, count: photos.length, kind: kind });
+    }
+
+    /* logo / hero -> config blob */
+    if (!found.cols.config) { return jsonOut_({ error: 'Salons tab missing config header — run setup()' }); }
+    var cfg = {};
+    try { cfg = JSON.parse(String(found.sheet.getRange(found.rowNum, found.cols.config).getValue() || '{}')); } catch (e4) { cfg = {}; }
+    if (!cfg || typeof cfg !== 'object') { cfg = {}; }
+    if (kind === 'logo') { cfg.logo = url; } else { cfg.heroImage = url; }
+    found.sheet.getRange(found.rowNum, found.cols.config).setValue(JSON.stringify(cfg));
+    return jsonOut_({ ok: true, url: url, kind: kind });
   } finally {
     lock.releaseLock();
   }
@@ -1497,8 +1529,10 @@ function handleSalonEdit_(body) {
       }
     });
 
-    /* 2) config-blob keys (hours / instagram / services) */
-    var touchesConfig = (fields.hours !== undefined || fields.instagram !== undefined || fields.services !== undefined);
+    /* 2) config-blob keys (hours / instagram / services + v6.3:
+       heroTitle / logo / heroImage for the portal site editor) */
+    var touchesConfig = (fields.hours !== undefined || fields.instagram !== undefined || fields.services !== undefined ||
+      fields.heroTitle !== undefined || fields.logo !== undefined || fields.heroImage !== undefined);
     if (touchesConfig) {
       if (!cols.config) { return jsonOut_({ error: 'Salons tab missing config header — run setup()' }); }
       var cfg = {};
@@ -1507,7 +1541,22 @@ function handleSalonEdit_(body) {
       if (fields.hours !== undefined) { cfg.hours = sanitizeHours_(fields.hours); }
       if (fields.instagram !== undefined) { cfg.instagram = sanitizeInstagram_(fields.instagram); }
       if (fields.services !== undefined) { cfg.services = sanitizeServices_(fields.services); }
+      if (fields.heroTitle !== undefined) { cfg.heroTitle = String(fields.heroTitle || '').trim().slice(0, 120); }
+      if (fields.logo !== undefined) { cfg.logo = sanitizeImgUrl_(fields.logo); }
+      if (fields.heroImage !== undefined) { cfg.heroImage = sanitizeImgUrl_(fields.heroImage); }
       sh.getRange(m.rowNum, cols.config).setValue(JSON.stringify(cfg));
+    }
+
+    /* 2b) v6.3: photos array (portal delete/reorder). Only OUR
+       Drive-hosted URLs are accepted, capped at the salon limit. */
+    if (fields.photos !== undefined) {
+      if (!Array.isArray(fields.photos)) { return jsonOut_({ error: 'photos must be an array of image URLs' }); }
+      var cleanPhotos = [];
+      for (var pi = 0; pi < fields.photos.length && cleanPhotos.length < MAX_PHOTOS_PER_SALON; pi++) {
+        var pu = sanitizeImgUrl_(fields.photos[pi]);
+        if (pu) { cleanPhotos.push(pu); }
+      }
+      if (cols.photos) { sh.getRange(m.rowNum, cols.photos).setValue(JSON.stringify(cleanPhotos)); }
     }
 
     /* 3) read the row back as the updated record */
