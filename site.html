@@ -373,6 +373,110 @@ var SV_LEAD_PROXY = 'https://salonvine-app.netlify.app/.netlify/functions/site-l
 var SV_EXTRA = 'https://salonvine-app.netlify.app/.netlify/functions/site-extra';
 var SV_DEPOSIT = 'https://salonvine-app.netlify.app/.netlify/functions/booking-deposit';
 var SV_DEPOSIT_CONFIRM = 'https://salonvine-app.netlify.app/.netlify/functions/deposit-confirm';
+/* ---------------- Supabase (the new backend) ---------------- */
+/* Salons listed here load from Supabase. Every salon NOT listed carries on
+   using Apps Script exactly as before. To put a salon back, delete its slug
+   from this list — that is the whole undo.
+   Note: this changes only what the page DISPLAYS. Booking requests still go
+   to the old backend through SV_LEAD_PROXY, so nothing can be lost here. */
+var SV_SUPABASE_URL = 'https://zdlytaswwvemnlgnonnd.supabase.co';
+var SV_SUPABASE_KEY = 'sb_publishable_RWlZ237RfOdorUJycQs2JQ_pFHiGjMX';
+var SV_SUPABASE_SALONS = ['haller-hair'];
+
+/* Supabase returns tidier data than Apps Script did: prices in whole pence,
+   opening hours as seven rows, the team as records. The page was written
+   against the old shapes, so translate here rather than rewrite the page. */
+function svMoney(v) {
+  if (v === null || v === undefined || v === '') { return ''; }
+  if (typeof v !== 'number') { return String(v); }
+  var whole = Math.floor(v / 100), cents = v % 100;
+  return '$' + whole + (cents ? '.' + (cents < 10 ? '0' : '') + cents : '');
+}
+function svClock(t) {
+  var m = /^(\d{1,2}):(\d{2})/.exec(String(t || ''));
+  if (!m) { return ''; }
+  var h = Number(m[1]), mins = m[2];
+  var ap = h < 12 ? 'am' : 'pm';
+  var h12 = h % 12 === 0 ? 12 : h % 12;
+  return h12 + (mins === '00' ? '' : ':' + mins) + ap;
+}
+function svHoursText(rows) {
+  if (!Array.isArray(rows) || !rows.length) { return ''; }
+  var NAMES = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
+  var ORDER = [1, 2, 3, 4, 5, 6, 0];   /* show Monday first */
+  var by = {};
+  rows.forEach(function (r) { by[Number(r.weekday)] = r; });
+  var parts = [], run = null;
+  function flush() {
+    if (!run) { return; }
+    var label = run.from === run.to ? NAMES[run.from]
+      : NAMES[run.from] + '\u2013' + NAMES[run.to];
+    parts.push(label + ' ' + run.text);
+    run = null;
+  }
+  ORDER.forEach(function (d) {
+    var r = by[d];
+    var text = (!r || r.closed) ? 'closed'
+      : (svClock(r.opens) + '\u2013' + svClock(r.closes));
+    if (run && run.text === text) { run.to = d; } else { flush(); run = { from: d, to: d, text: text }; }
+  });
+  flush();
+  return parts.join(' \u00b7 ');
+}
+function svAdaptSupabase(d) {
+  return {
+    ok: true,
+    name: d.name,
+    slug: d.slug,
+    tagline: d.tagline,
+    about: d.about,
+    theme: d.theme,
+    accent: d.accent,
+    logo: d.logo,
+    heroImage: d.heroImage,
+    heroTitle: d.heroTitle,
+    aboutImage: d.aboutImage,
+    instagram: d.instagram,
+    photos: Array.isArray(d.photos) ? d.photos : [],
+    hours: svHoursText(d.hours),
+    services: (Array.isArray(d.services) ? d.services : []).map(function (s) {
+      return { name: s.name, price: svMoney(s.price), minutes: s.minutes };
+    }),
+    stylists: (Array.isArray(d.team) ? d.team : []).map(function (t) { return t.name; }).filter(Boolean)
+  };
+}
+function svFromSupabase(slug) {
+  return fetch(SV_SUPABASE_URL + '/rest/v1/rpc/sv_site', {
+    method: 'POST',
+    headers: {
+      'apikey': SV_SUPABASE_KEY,
+      'Authorization': 'Bearer ' + SV_SUPABASE_KEY,
+      'Content-Type': 'application/json'
+    },
+    body: JSON.stringify({ p_slug: slug })
+  }).then(function (res) {
+    if (!res.ok) { throw new Error('supabase HTTP ' + res.status); }
+    return res.json();
+  }).then(function (d) {
+    if (!d || !d.name) { throw new Error('supabase: no salon named ' + slug); }
+    return svAdaptSupabase(d);
+  });
+}
+function svFromAppsScript(slug) {
+  return fetch(SV_EXEC + '?site=' + encodeURIComponent(slug)).then(function (res) {
+    if (!res.ok) { throw new Error('HTTP ' + res.status); }
+    return res.json();
+  });
+}
+/* If Supabase is slow, down, or wrong, the salon still gets its old page. */
+function svLoadSite(slug) {
+  if (SV_SUPABASE_SALONS.indexOf(slug) === -1) { return svFromAppsScript(slug); }
+  return svFromSupabase(slug).catch(function (e) {
+    if (window.console) { console.warn('Supabase failed, falling back to Apps Script:', e); }
+    return svFromAppsScript(slug);
+  });
+}
+
 
 /* ---------------- themes (kept in sync with signup.html) ---------------- */
 var THEMES = {
@@ -782,11 +886,7 @@ function showNotFound() {
   if (!slug) { showNotFound(); return; }
   /* Both at once. The extras call resolves to {} on any failure so a hiccup
      there can never blank a salon's page. */
-  var main = fetch(SV_EXEC + '?site=' + encodeURIComponent(slug))
-    .then(function (res) {
-      if (!res.ok) { throw new Error('HTTP ' + res.status); }
-      return res.json();
-    });
+  var main = svLoadSite(slug);
   var side = fetch(SV_EXTRA + '?slug=' + encodeURIComponent(slug))
     .then(function (res) { return res.ok ? res.json() : null; })
     .then(function (j) { return (j && j.extra) || {}; })
