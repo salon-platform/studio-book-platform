@@ -468,10 +468,21 @@ function svFromAppsScript(slug) {
     return res.json();
   });
 }
+/* Match the way the old backend did: ignoring hyphens, so both
+   hallerhair.salonvine.com and haller-hair.salonvine.com find the salon.
+   Returns the proper slug Supabase knows it by, or '' for not-moved-yet. */
+function svCanonicalSlug(slug) {
+  var bare = String(slug || '').replace(/-/g, '');
+  for (var i = 0; i < SV_SUPABASE_SALONS.length; i++) {
+    if (SV_SUPABASE_SALONS[i].replace(/-/g, '') === bare) { return SV_SUPABASE_SALONS[i]; }
+  }
+  return '';
+}
 /* If Supabase is slow, down, or wrong, the salon still gets its old page. */
 function svLoadSite(slug) {
-  if (SV_SUPABASE_SALONS.indexOf(slug) === -1) { return svFromAppsScript(slug); }
-  return svFromSupabase(slug).catch(function (e) {
+  var canonical = svCanonicalSlug(slug);
+  if (!canonical) { return svFromAppsScript(slug); }
+  return svFromSupabase(canonical).catch(function (e) {
     if (window.console) { console.warn('Supabase failed, falling back to Apps Script:', e); }
     return svFromAppsScript(slug);
   });
