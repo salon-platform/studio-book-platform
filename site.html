@@ -478,11 +478,24 @@ function svCanonicalSlug(slug) {
   }
   return '';
 }
+/* A request that never answers is worse than one that fails outright: the
+   page just spins and the salon looks broken. Every backend call gets a
+   deadline. Soft = carry on without it. Hard = treat it as failed. */
+function svSoftDeadline(p, ms, fallback) {
+  return Promise.race([p, new Promise(function (resolve) {
+    setTimeout(function () { resolve(fallback); }, ms);
+  })]);
+}
+function svHardDeadline(p, ms, label) {
+  return Promise.race([p, new Promise(function (undef, reject) {
+    setTimeout(function () { reject(new Error(label + ' timed out after ' + ms + 'ms')); }, ms);
+  })]);
+}
 /* If Supabase is slow, down, or wrong, the salon still gets its old page. */
 function svLoadSite(slug) {
   var canonical = svCanonicalSlug(slug);
   if (!canonical) { return svFromAppsScript(slug); }
-  return svFromSupabase(canonical).catch(function (e) {
+  return svHardDeadline(svFromSupabase(canonical), 6000, 'Supabase').catch(function (e) {
     if (window.console) { console.warn('Supabase failed, falling back to Apps Script:', e); }
     return svFromAppsScript(slug);
   });
@@ -897,11 +910,15 @@ function showNotFound() {
   if (!slug) { showNotFound(); return; }
   /* Both at once. The extras call resolves to {} on any failure so a hiccup
      there can never blank a salon's page. */
-  var main = svLoadSite(slug);
-  var side = fetch(SV_EXTRA + '?slug=' + encodeURIComponent(slug))
-    .then(function (res) { return res.ok ? res.json() : null; })
-    .then(function (j) { return (j && j.extra) || {}; })
-    .catch(function () { return {}; });
+  var main = svHardDeadline(svLoadSite(slug), 12000, 'salon lookup');
+  /* The extras are a nice-to-have. When they are slow the page goes without
+     them rather than making a client stare at a spinner for nine seconds. */
+  var side = svSoftDeadline(
+    fetch(SV_EXTRA + '?slug=' + encodeURIComponent(slug))
+      .then(function (res) { return res.ok ? res.json() : null; })
+      .then(function (j) { return (j && j.extra) || {}; })
+      .catch(function () { return {}; }),
+    2500, {});
 
   Promise.all([main, side])
     .then(function (r) {
