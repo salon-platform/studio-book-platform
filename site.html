@@ -442,7 +442,9 @@ function svAdaptSupabase(d) {
     services: (Array.isArray(d.services) ? d.services : []).map(function (s) {
       return { name: s.name, price: svMoney(s.price), minutes: s.minutes };
     }),
-    stylists: (Array.isArray(d.team) ? d.team : []).map(function (t) { return t.name; }).filter(Boolean)
+    stylists: (Array.isArray(d.team) ? d.team : []).map(function (t) { return t.name; }).filter(Boolean),
+    /* raw records with ids, so the form can make a real booking */
+    _sb: { slug: d.slug, timezone: d.timezone, team: Array.isArray(d.team) ? d.team : [], services: Array.isArray(d.services) ? d.services : [] }
   };
 }
 function svFromSupabase(slug) {
@@ -965,6 +967,11 @@ document.getElementById('leadForm').addEventListener('submit', function (e) {
   document.getElementById('lfEmail').classList.toggle('invalid', reachBad);
   if (nameBad || reachBad) { return; }
 
+  /* Salons on Supabase: a real booking against the stylist's calendar. Returns
+     false when it cannot (no service or no real time picked) so the old
+     request path below still runs and nothing dead-ends. */
+  if (svBookSupabase({ name: name, phone: phone, email: email, message: message, service: service, stylist: stylist, date: dateVal, time: timeVal })) { return; }
+
   var btn = document.getElementById('leadBtn');
   var msg = document.getElementById('leadMsg');
   btn.disabled = true;
@@ -1075,6 +1082,143 @@ document.getElementById('leadForm').addEventListener('submit', function (e) {
       clean();
     });
 })();
+
+/* ---------------- Real bookings on Supabase ---------------- */
+/* For salons on Supabase the form stops being a note to the owner and becomes
+   a real booking: the time list shows actual openings from the stylists'
+   calendars, and sending creates the appointment — confirmed on the spot or
+   held as a request, whichever that stylist chose in her portal. The
+   database refuses a double booking, so two clients can never take one slot.
+   Anything this path cannot handle (no service picked, no date) still goes
+   the old way, so there is no dead end. */
+var SV_SB_SALON = null;   /* { id, timezone } once looked up */
+
+function svSbHeaders() {
+  return { 'apikey': SV_SUPABASE_KEY, 'Authorization': 'Bearer ' + SV_SUPABASE_KEY, 'Content-Type': 'application/json' };
+}
+function svSbMessage(text, status) {
+  try { var j = JSON.parse(text); return j.message || j.hint || ('HTTP ' + status); } catch (e) { return 'HTTP ' + status; }
+}
+function svSbRpc(name, args) {
+  return svHardDeadline(
+    fetch(SV_SUPABASE_URL + '/rest/v1/rpc/' + name, { method: 'POST', headers: svSbHeaders(), body: JSON.stringify(args) })
+      .then(function (res) {
+        return res.text().then(function (t) {
+          if (!res.ok) { throw new Error(svSbMessage(t, res.status)); }
+          return t ? JSON.parse(t) : null;
+        });
+      }),
+    8000, name);
+}
+function svSalonId() {
+  if (SV_SB_SALON) { return Promise.resolve(SV_SB_SALON); }
+  var slug = (SITE && SITE._sb && SITE._sb.slug) || svCanonicalSlug(currentSlug());
+  return svHardDeadline(
+    fetch(SV_SUPABASE_URL + '/rest/v1/salon?select=id,timezone&slug=eq.' + encodeURIComponent(slug), { headers: svSbHeaders() })
+      .then(function (r) { return r.json(); }),
+    8000, 'salon lookup'
+  ).then(function (rows) {
+    if (!rows || !rows[0]) { throw new Error('salon not found'); }
+    SV_SB_SALON = rows[0];
+    return SV_SB_SALON;
+  });
+}
+function svPick(list, name) {
+  for (var i = 0; i < list.length; i++) { if (list[i].name === name) { return list[i]; } }
+  return null;
+}
+function svClockTz(iso, tz) {
+  try {
+    return new Date(iso).toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit', timeZone: tz }).toLowerCase().replace(' ', '');
+  } catch (e) { return new Date(iso).toLocaleTimeString(); }
+}
+
+/* Fill the time list with real openings for the chosen day, service and stylist. */
+function svFillSlots() {
+  if (!(SITE && SITE._sb)) { return; }
+  var dateVal = document.getElementById('leadDate').value;
+  var svc = svPick(SITE._sb.services, document.getElementById('leadService').value);
+  var sty = svPick(SITE._sb.team, document.getElementById('leadStylist').value);
+  var timeSel = document.getElementById('leadTime');
+  if (!dateVal) { timeSel.innerHTML = '<option value="">Pick a date first</option>'; return; }
+  if (!svc) { timeSel.innerHTML = '<option value="">Pick a service first</option>'; return; }
+  timeSel.disabled = true;
+  timeSel.innerHTML = '<option value="">Checking openings…</option>';
+  svSalonId().then(function (s) {
+    return svSbRpc('sv_slots', { p_salon_id: s.id, p_from: dateVal, p_to: dateVal, p_service_ids: [svc.id], p_stylist_id: sty ? sty.id : null });
+  }).then(function (slots) {
+    timeSel.disabled = false;
+    if (!slots || !slots.length) {
+      timeSel.innerHTML = '<option value="">No openings that day — try another date</option>';
+      return;
+    }
+    timeSel.innerHTML = '<option value="">Pick a time</option>' + slots.map(function (sl) {
+      var label = svClockTz(sl.starts_at, SITE._sb.timezone) + (sty ? '' : ' with ' + sl.stylist_name);
+      return '<option value="' + esc(sl.starts_at + '|' + sl.stylist_id) + '">' + esc(label) + '</option>';
+    }).join('');
+  }).catch(function (e) {
+    timeSel.disabled = false;
+    timeSel.innerHTML = '<option value="">Could not load openings — ' + esc(e.message) + '</option>';
+  });
+}
+['leadDate', 'leadService', 'leadStylist'].forEach(function (id) {
+  document.getElementById(id).addEventListener('change', svFillSlots);
+});
+
+/* After the page renders a Supabase salon, the form speaks like a booking form. */
+var svRenderBase = render;
+render = function (cfg, extra) {
+  svRenderBase(cfg, extra);
+  if (!(cfg && cfg._sb)) { return; }
+  document.getElementById('leadTime').innerHTML = '<option value="">Pick a date first</option>';
+  document.getElementById('leadBtn').textContent = 'Book';
+  var hint = document.querySelector('#leadForm .hint');
+  if (hint) { hint.textContent = 'The times shown are real openings from the stylists\u2019 calendars.'; }
+};
+
+/* Returns true if it handled the booking, false to let the old path run. */
+function svBookSupabase(f) {
+  if (!(SITE && SITE._sb)) { return false; }
+  var svc = svPick(SITE._sb.services, f.service);
+  var parts = String(f.time || '').split('|');
+  if (!svc || !f.date || parts.length !== 2) { return false; }
+  var btn = document.getElementById('leadBtn');
+  var msg = document.getElementById('leadMsg');
+  btn.disabled = true;
+  btn.textContent = 'Booking…';
+  msg.style.display = 'none';
+  msg.className = '';
+  svSalonId().then(function (s) {
+    return svSbRpc('sv_book', {
+      p_salon_id: s.id, p_stylist_id: parts[1], p_service_ids: [svc.id], p_starts_at: parts[0],
+      p_client_name: f.name, p_client_email: f.email || null, p_client_phone: f.phone || null, p_client_note: f.message || null
+    });
+  }).then(function (rows) {
+    var bk = rows && rows[0];
+    if (!bk) { throw new Error('no booking returned'); }
+    var confirmed = String(bk.status) === 'confirmed';
+    msg.className = 'ok';
+    msg.textContent = confirmed
+      ? 'You\u2019re booked!' + (f.email ? ' A confirmation is on its way to ' + f.email + '.' : '')
+      : 'Request sent \u2014 ' + ((SITE && SITE.name) || 'the salon') + ' will confirm shortly' + (f.email ? ' by email.' : '.');
+    msg.style.display = 'block';
+    btn.textContent = confirmed ? 'Booked \u2713' : 'Request sent \u2713';
+    document.getElementById('leadForm').reset();
+    document.getElementById('leadTime').innerHTML = '<option value="">Pick a date first</option>';
+  }).catch(function (err) {
+    var taken = /taken|overlap|conflict|available|exclusion/i.test(err.message);
+    msg.className = 'err';
+    msg.textContent = taken
+      ? 'That time was just taken \u2014 please pick another.'
+      : 'That didn\u2019t go through (' + err.message + '). Please try again in a moment.';
+    msg.style.display = 'block';
+    btn.disabled = false;
+    btn.textContent = 'Book';
+    svFillSlots();
+  });
+  return true;
+}
+
 </script>
 
 </body>
