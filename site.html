@@ -4,534 +4,513 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Salon Vine</title>
-<meta name="description" content="A beautiful salon website, powered by Salon Vine.">
-<meta name="robots" content="index,follow">
-<link rel="icon" type="image/png" sizes="32x32" href="/favicon-32.png">
-<link rel="apple-touch-icon" href="/icon-180.png">
-<link href="https://fonts.googleapis.com/css2?family=Playfair+Display:ital,wght@0,500;0,600;0,700;1,500&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+<meta name="description" content="">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,400;0,500;0,600;1,400&family=Jost:wght@300;400;500&display=swap" rel="stylesheet">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Ccircle cx='32' cy='32' r='30' fill='%23a8836a'/%3E%3C/svg%3E" id="favicon">
+<meta name="theme-color" content="#a8836a" id="themeColor">
 <style>
-/* ============================================================
-   Universal salon-site renderer. All CSS inline & theme-driven
-   via custom properties so one file serves every salon.
-   ============================================================ */
-:root{
-  --bg:#faf6f0; --bg2:#f2ece2; --surface:#ffffff;
-  --ink:#211d1a; --soft:#5c5148; --accent:#a8836a;
-  --line:rgba(128,116,105,.22);
-  --serif:'Playfair Display',Georgia,serif;
-  --sans:'Inter',system-ui,sans-serif;
-}
-*{box-sizing:border-box}
-html{scroll-behavior:smooth}
-body{margin:0;font-family:var(--sans);color:var(--ink);background:var(--bg);line-height:1.65;-webkit-font-smoothing:antialiased;transition:background .3s,color .3s}
-h1,h2,h3{font-family:var(--serif);font-weight:600;margin:0}
-a{color:inherit;text-decoration:none}
-img{max-width:100%;display:block}
-.container{max-width:1040px;margin:0 auto;padding:0 22px}
-.btn{display:inline-block;padding:15px 30px;border-radius:3px;font-size:.85rem;letter-spacing:.07em;text-transform:uppercase;border:1px solid transparent;cursor:pointer;font-weight:600;font-family:var(--sans);transition:opacity .2s,transform .15s}
-.btn:hover{opacity:.88;transform:translateY(-1px)}
-.btn-accent{background:var(--accent);color:#fff}
-.btn-ghost{border-color:var(--ink);color:var(--ink);background:transparent}
+  /* ============================================================
+     Salon Vine public salon page — v8 "Studio 17" design.
+     One page for every salon. Everything on it comes from Supabase
+     (sv_site). Colours come from the salon's theme + accent.
+     ============================================================ */
+  :root{
+    --ink:#2b2624; --ink-soft:#6b615c; --cream:#faf7f3; --sand:#f1eae2;
+    --blush:#e8d8cf; --bronze:#a8836a; --bronze-dark:#8a6a54; --line:#e3d9cf;
+    --white:#ffffff; --err:#b4574e; --ok:#5d8a6a;
+  }
+  *{margin:0;padding:0;box-sizing:border-box}
+  html{scroll-behavior:smooth}
+  body{font-family:'Jost',sans-serif;font-weight:300;color:var(--ink);background:var(--cream);line-height:1.7;-webkit-font-smoothing:antialiased}
+  h1,h2,h3,h4{font-family:'Cormorant Garamond',serif;font-weight:500;line-height:1.15}
+  a{color:inherit}
+  img{max-width:100%}
+  .wrap{max-width:1100px;margin:0 auto;padding:0 24px}
+  .rv{opacity:0;transform:translateY(22px);transition:opacity .7s ease,transform .7s ease}
+  .rv.in{opacity:1;transform:none}
+  [hidden]{display:none !important}
 
-/* loading / notfound */
-#loading{min-height:70vh;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:18px;color:var(--soft)}
-.spinner{width:34px;height:34px;border:3px solid var(--line);border-top-color:var(--accent);border-radius:50%;animation:spin .8s linear infinite}
-@keyframes spin{to{transform:rotate(360deg)}}
-#notFound{min-height:70vh;display:none;flex-direction:column;align-items:center;justify-content:center;text-align:center;padding:0 24px;gap:14px}
-#notFound h1{font-size:2rem}
-#notFound p{color:var(--soft);max-width:440px;margin:0}
+  header{position:sticky;top:0;z-index:50;background:color-mix(in srgb, var(--cream) 92%, transparent);backdrop-filter:blur(10px);border-bottom:1px solid var(--line)}
+  .nav{display:flex;align-items:center;justify-content:space-between;height:72px}
+  .logo{font-family:'Cormorant Garamond',serif;font-size:1.55rem;letter-spacing:.06em;text-decoration:none;display:flex;align-items:center;gap:12px}
+  .logo span{color:var(--bronze)}
+  .logo img{height:40px;width:auto;display:block}
+  .nav-links{display:flex;gap:30px;align-items:center;list-style:none}
+  .nav-links a{text-decoration:none;font-size:.8rem;letter-spacing:.22em;text-transform:uppercase;color:var(--ink-soft);transition:color .2s}
+  .nav-links a:hover{color:var(--bronze-dark)}
+  .btn{display:inline-block;text-decoration:none;font-size:.78rem;letter-spacing:.24em;text-transform:uppercase;padding:14px 32px;border:1px solid var(--bronze);color:var(--bronze-dark);background:transparent;transition:background .25s,color .25s;cursor:pointer;font-family:'Jost',sans-serif}
+  .btn:hover{background:var(--bronze);color:var(--white)}
+  .btn.solid{background:var(--bronze);color:var(--white)}
+  .btn.solid:hover{background:var(--bronze-dark);border-color:var(--bronze-dark)}
+  .btn.ghost{border-color:var(--line);color:var(--ink-soft)}
+  .btn.ghost:hover{background:var(--sand);color:var(--ink)}
+  .btn:disabled{opacity:.45;cursor:default}
+  .btn:disabled:hover{background:var(--bronze);color:var(--white)}
+  .nav .btn{padding:11px 24px}
+  @media(max-width:900px){.nav-links li:not(:last-child){display:none}}
 
-/* site */
-#site{display:none}
-header.top{position:sticky;top:0;z-index:40;background:color-mix(in srgb,var(--bg) 88%,transparent);backdrop-filter:blur(8px);border-bottom:1px solid var(--line)}
-.topnav{display:flex;align-items:center;justify-content:space-between;max-width:1040px;margin:0 auto;padding:16px 22px}
-.topnav .salon-brand{font-family:var(--serif);font-size:1.25rem;letter-spacing:.01em;display:flex;align-items:center;gap:12px}
-.topnav .salon-brand em{color:var(--accent);font-style:normal}
-/* v6.3: owner-uploaded logo in the header (portal editor) */
-.topnav .salon-logo{height:38px;max-width:170px;object-fit:contain;border-radius:6px;display:none}
-@media(max-width:520px){.topnav .salon-logo{height:30px;max-width:120px}}
-.topnav .btn{padding:11px 20px}
+  .hero{position:relative;overflow:hidden;background:var(--ink);text-align:center;padding:128px 24px 136px;color:var(--cream)}
+  .hero-slides{position:absolute;inset:0}
+  .hero-slides .slide{position:absolute;inset:-4%;background-size:cover;background-position:center 25%;opacity:0;animation:heroFade 16s infinite;filter:saturate(.92);will-change:opacity,transform}
+  .hero-slides.single .slide{animation:none;opacity:1}
+  @keyframes heroFade{0%{opacity:0;transform:scale(1)}5%{opacity:1}25%{opacity:1}33%{opacity:0;transform:scale(1.09)}100%{opacity:0}}
+  .hero::before{content:"";position:absolute;inset:0;z-index:1;background:linear-gradient(180deg, rgba(30,25,22,.82) 0%, rgba(30,25,22,.66) 45%, rgba(30,25,22,.85) 100%)}
+  .hero-inner{position:relative;z-index:2}
+  .hero .eyebrow{font-size:.75rem;letter-spacing:.38em;text-transform:uppercase;color:var(--blush);margin-bottom:26px}
+  .hero h1{font-size:clamp(2.6rem,6.5vw,4.6rem);max-width:16ch;margin:0 auto 24px;color:var(--white)}
+  .hero h1 em{font-style:italic;color:var(--blush)}
+  .hero p{max-width:52ch;margin:0 auto 40px;color:rgba(250,247,243,.85);font-size:1.05rem}
+  .hero .actions{display:flex;gap:16px;justify-content:center;flex-wrap:wrap}
+  .hero .btn{border-color:var(--blush);color:var(--cream)}
+  .hero .btn:hover{background:var(--blush);color:var(--ink)}
+  .hero .btn.solid{background:var(--bronze);border-color:var(--bronze);color:var(--white)}
+  .hero .btn.solid:hover{background:var(--bronze-dark)}
+  .hero .cities{margin-top:52px;font-size:.78rem;letter-spacing:.3em;text-transform:uppercase;color:rgba(250,247,243,.6)}
+  .hero .cities b{font-weight:400;color:var(--cream)}
+  .flourish{width:60px;height:1px;background:var(--blush);margin:34px auto 0;position:relative}
+  .flourish::before,.flourish::after{content:"";position:absolute;top:-2.5px;width:6px;height:6px;border-radius:50%;background:var(--blush)}
+  .flourish::before{left:-12px}.flourish::after{right:-12px}
+  @media (prefers-reduced-motion: reduce){.hero-slides .slide{animation:none}.hero-slides .slide:first-child{opacity:1}}
 
-.hero{padding:96px 0 84px;text-align:center;position:relative;overflow:hidden}
-.hero:before{content:"";position:absolute;inset:auto -20% -60% -20%;height:130%;background:radial-gradient(ellipse at 50% 100%,color-mix(in srgb,var(--accent) 14%,transparent),transparent 65%);pointer-events:none}
-/* v6.3: owner-uploaded hero background (portal editor). The image
-   sits behind a dark overlay so the heading always stays readable.
-   v7: every salon gets a hero image — the owner's own upload when they
-   have one, otherwise a curated stock shot matched to their theme. The
-   image lives on its own layer (.hero-bg) so it can drift slowly
-   (Ken Burns) without moving the text. */
-.hero.has-img{color:#fff;padding:138px 0 118px}
-.hero-bg{position:absolute;inset:-4%;background-size:cover;background-position:center;z-index:0;display:none}
-.hero.has-img .hero-bg{display:block;animation:kenburns 26s ease-in-out infinite alternate}
-@keyframes kenburns{from{transform:scale(1) translate(0,0)}to{transform:scale(1.09) translate(-1.2%,1%)}}
-.hero.has-img:before{inset:0;height:auto;background:linear-gradient(rgba(12,10,9,.5),rgba(12,10,9,.64));z-index:1}
-.hero.has-img .container{z-index:2}
-.hero.has-img h1,.hero.has-img .tagline{color:#fff}
-.hero.has-img .tagline{opacity:.94}
-.hero.has-img .eyebrow{color:#f3e8dc}
-.hero .eyebrow{letter-spacing:.26em;text-transform:uppercase;font-size:.74rem;color:var(--accent);margin-bottom:20px;font-weight:600;display:flex;align-items:center;justify-content:center;gap:14px}
-.hero .eyebrow:before,.hero .eyebrow:after{content:"";width:34px;height:1px;background:currentColor;opacity:.55}
-.hero h1{font-size:clamp(2.6rem,7vw,4.2rem);line-height:1.06;max-width:860px;margin:0 auto 18px;text-shadow:0 1px 24px rgba(0,0,0,.12)}
-.hero .tagline{font-family:var(--serif);font-style:italic;font-size:clamp(1.05rem,2.6vw,1.35rem);color:var(--soft);max-width:640px;margin:0 auto 38px}
-.hero .rule{width:56px;height:2px;margin:0 auto 30px;background:linear-gradient(90deg,var(--accent),color-mix(in srgb,var(--accent) 40%,#fff),var(--accent));background-size:200% 100%;animation:sheen 5.5s ease-in-out infinite}
-@keyframes sheen{0%,100%{background-position:0% 0}50%{background-position:100% 0}}
-/* hero content walks in on load: eyebrow, name, rule, tagline, button */
-.hero .container>*{opacity:0;transform:translateY(16px);animation:heroin .8s ease forwards}
-.hero .container>*:nth-child(1){animation-delay:.05s}
-.hero .container>*:nth-child(2){animation-delay:.18s}
-.hero .container>*:nth-child(3){animation-delay:.34s}
-.hero .container>*:nth-child(4){animation-delay:.46s}
-.hero .container>*:nth-child(5){animation-delay:.58s}
-@keyframes heroin{to{opacity:1;transform:none}}
-@media (prefers-reduced-motion:reduce){
-  .hero.has-img .hero-bg{animation:none}
-  .hero .rule{animation:none}
-  .hero .container>*{opacity:1;transform:none;animation:none}
-}
+  .stats{background:var(--cream);border-bottom:1px solid var(--line);padding:0}
+  .stats .row{display:grid;grid-template-columns:repeat(4,1fr);max-width:1100px;margin:0 auto}
+  @media(max-width:680px){.stats .row{grid-template-columns:1fr 1fr}}
+  .stats .cell{text-align:center;padding:30px 12px;border-right:1px solid var(--line)}
+  .stats .cell:last-child{border-right:none}
+  @media(max-width:680px){.stats .cell:nth-child(2){border-right:none}.stats .cell:nth-child(-n+2){border-bottom:1px solid var(--line)}}
+  .stats .n{font-family:'Cormorant Garamond',serif;font-size:1.9rem;color:var(--bronze-dark);line-height:1.2}
+  .stats .l{font-size:.7rem;letter-spacing:.26em;text-transform:uppercase;color:var(--ink-soft)}
 
-.section{padding:78px 0}
-.section-label{color:var(--accent);letter-spacing:.22em;text-transform:uppercase;font-size:.72rem;text-align:center;display:block;margin-bottom:10px;font-weight:600}
-.section h2{text-align:center;font-size:clamp(1.7rem,4vw,2.2rem);margin-bottom:14px}
-.section .sub{text-align:center;color:var(--soft);max-width:560px;margin:0 auto 46px;font-size:.98rem}
+  .burger{display:none;background:none;border:none;cursor:pointer;padding:8px;flex-direction:column;gap:5px}
+  .burger span{display:block;width:22px;height:1.5px;background:var(--ink);transition:transform .25s,opacity .25s}
+  @media(max-width:900px){
+    .burger{display:flex}
+    .nav-links{position:absolute;top:72px;left:0;right:0;background:var(--cream);border-bottom:1px solid var(--line);flex-direction:column;padding:18px 24px 24px;gap:18px;display:none;align-items:flex-start}
+    .nav-links.open{display:flex}
+    .nav-links li{display:block !important}
+  }
+  .mobbar{display:none;position:fixed;left:0;right:0;bottom:0;z-index:60;background:var(--bronze);text-align:center;box-shadow:0 -8px 24px -12px rgba(43,38,36,.4)}
+  .mobbar a{display:block;color:var(--white);text-decoration:none;font-size:.8rem;letter-spacing:.26em;text-transform:uppercase;padding:16px}
+  @media(max-width:680px){.mobbar.show{display:block}}
 
-/* gallery */
-#gallerySection{background:var(--bg2)}
-.gallery{display:grid;grid-template-columns:repeat(3,1fr);gap:14px}
-/* v6.3: no blank cells — an orphan last row stretches to fill it.
-   A lone last shot goes full-width; two-in-a-row makes the second
-   span the remaining space. */
-.gallery .shot:last-child:nth-child(3n+1){grid-column:1/-1;aspect-ratio:16/7}
-.gallery .shot:last-child:nth-child(3n+2){grid-column:span 2;aspect-ratio:16/7.5}
-@media(max-width:720px){.gallery{grid-template-columns:repeat(2,1fr)}
-  .gallery .shot:last-child:nth-child(3n+1),.gallery .shot:last-child:nth-child(3n+2){grid-column:auto;aspect-ratio:4/3}
-  .gallery .shot:last-child:nth-child(odd){grid-column:1/-1;aspect-ratio:16/8}}
-@media(max-width:440px){.gallery{grid-template-columns:1fr}
-  .gallery .shot:last-child:nth-child(odd){grid-column:auto;aspect-ratio:4/3}}
-.gallery .shot{aspect-ratio:4/3;border-radius:10px;overflow:hidden;background:var(--surface);border:1px solid var(--line);cursor:zoom-in;padding:0}
-.gallery .shot img{width:100%;height:100%;object-fit:cover;transition:transform .5s ease}
-.gallery .shot:hover img{transform:scale(1.04)}
+  section{padding:92px 0}
+  .sec-head{text-align:center;margin-bottom:56px}
+  .sec-head .eyebrow{font-size:.72rem;letter-spacing:.36em;text-transform:uppercase;color:var(--bronze);margin-bottom:14px}
+  .sec-head h2{font-size:clamp(2rem,4vw,2.9rem)}
+  .sec-head p{max-width:56ch;margin:16px auto 0;color:var(--ink-soft)}
 
-/* lightbox (v2) — no libraries */
-#lightbox{position:fixed;inset:0;z-index:120;background:rgba(8,8,10,.92);display:none;align-items:center;justify-content:center}
-#lightbox.open{display:flex}
-#lightbox img{max-width:92vw;max-height:86vh;border-radius:8px;box-shadow:0 20px 70px rgba(0,0,0,.6);object-fit:contain}
-#lightbox .lb-btn{position:absolute;background:rgba(255,255,255,.12);border:1px solid rgba(255,255,255,.25);color:#fff;cursor:pointer;border-radius:50%;width:46px;height:46px;font-size:1.25rem;line-height:1;display:flex;align-items:center;justify-content:center;transition:background .2s}
-#lightbox .lb-btn:hover{background:rgba(255,255,255,.24)}
-#lightbox .lb-close{top:18px;right:18px}
-#lightbox .lb-prev{left:14px;top:50%;transform:translateY(-50%)}
-#lightbox .lb-next{right:14px;top:50%;transform:translateY(-50%)}
-#lightbox .lb-count{position:absolute;bottom:16px;left:50%;transform:translateX(-50%);color:rgba(255,255,255,.75);font-size:.82rem;letter-spacing:.08em}
-@media(max-width:520px){#lightbox .lb-prev{left:6px}#lightbox .lb-next{right:6px}}
+  .services{background:var(--white);border-top:1px solid var(--line);border-bottom:1px solid var(--line)}
+  .cat-tabs{display:flex;justify-content:center;flex-wrap:wrap;gap:8px;margin-bottom:44px}
+  .cat-tabs button{font-family:'Jost',sans-serif;font-weight:300;font-size:.78rem;letter-spacing:.18em;text-transform:uppercase;padding:11px 20px;border:1px solid var(--line);background:var(--white);color:var(--ink-soft);cursor:pointer;transition:all .2s}
+  .cat-tabs button:hover{border-color:var(--bronze);color:var(--bronze-dark)}
+  .cat-tabs button.sel{background:var(--bronze);border-color:var(--bronze);color:var(--white)}
+  .menu-cols{columns:2;column-gap:56px;max-width:900px;margin:0 auto}
+  @media(max-width:760px){.menu-cols{columns:1}}
+  .menu-item{display:flex;justify-content:space-between;align-items:baseline;gap:14px;padding:11px 0;border-bottom:1px dashed var(--line);break-inside:avoid;font-size:.96rem}
+  .menu-item .n{flex:1}
+  .menu-item .d{font-size:.78rem;color:#b0a69c;white-space:nowrap}
+  .menu-item .p{color:var(--bronze-dark);font-weight:400;white-space:nowrap}
+  .svc-note{text-align:center;margin-top:38px;color:var(--ink-soft);font-size:.9rem;font-style:italic}
 
-/* visit details — hours + instagram (v2) */
-.visit-row{display:flex;justify-content:center;gap:26px;flex-wrap:wrap;margin:0 auto 34px;max-width:560px}
-.visit-item{display:flex;align-items:center;gap:9px;font-size:.92rem;color:var(--soft)}
-.visit-item svg{width:18px;height:18px;color:var(--accent);flex-shrink:0}
-.visit-item a{color:var(--accent);font-weight:600}
-.visit-item a:hover{text-decoration:underline}
-#visitLinks{gap:6px}
+  .team-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:24px}
+  @media(max-width:900px){.team-grid{grid-template-columns:repeat(2,1fr)}}
+  @media(max-width:600px){.team-grid{grid-template-columns:1fr}}
+  .member{background:var(--white);border:1px solid var(--line);padding:38px 28px;text-align:center;cursor:pointer;transition:border-color .25s,transform .25s,box-shadow .25s}
+  .member:hover{border-color:var(--bronze);transform:translateY(-3px);box-shadow:0 18px 40px -26px rgba(43,38,36,.35)}
+  .member .initials{width:112px;height:112px;margin:0 auto 20px;border-radius:50%;background:linear-gradient(135deg,var(--blush),var(--sand));display:flex;align-items:center;justify-content:center;font-family:'Cormorant Garamond',serif;font-size:1.8rem;color:var(--bronze-dark);position:relative;overflow:hidden;border:3px solid var(--white);box-shadow:0 0 0 1px var(--blush)}
+  .member .initials img,.modal-head .initials img{width:100%;height:100%;object-fit:cover;display:block}
+  .member h3{font-size:1.4rem}
+  .member .role{font-size:.72rem;letter-spacing:.26em;text-transform:uppercase;color:var(--bronze);margin:7px 0 12px}
+  .member p{color:var(--ink-soft);font-size:.9rem;min-height:44px}
+  .member .view{display:inline-block;margin-top:16px;font-size:.72rem;letter-spacing:.24em;text-transform:uppercase;color:var(--bronze-dark);border-bottom:1px solid var(--blush);padding-bottom:3px}
+  .member .mode{display:block;margin-top:10px;font-size:.7rem;letter-spacing:.16em;text-transform:uppercase;color:#b0a69c}
 
-/* sticky mobile "Request appointment" bar (v2) */
-#stickyBook{display:none}
-@media(max-width:720px){
-  #stickyBook{display:block;position:fixed;left:0;right:0;bottom:0;z-index:60;padding:10px 14px calc(10px + env(safe-area-inset-bottom));background:color-mix(in srgb,var(--bg) 90%,transparent);backdrop-filter:blur(8px);border-top:1px solid var(--line);transition:transform .3s ease,opacity .3s ease}
-  #stickyBook .btn{width:100%;text-align:center;display:block}
-  #stickyBook.hidden{transform:translateY(110%);opacity:0;pointer-events:none}
-  body.has-sticky{padding-bottom:76px}
-}
-@media (prefers-reduced-motion:reduce){#stickyBook{transition:none}}
+  .modal-bg{position:fixed;inset:0;background:rgba(43,38,36,.55);z-index:90;display:none;align-items:flex-start;justify-content:center;padding:40px 18px;overflow-y:auto}
+  .modal-bg.open{display:flex}
+  .modal{background:var(--cream);max-width:640px;width:100%;border:1px solid var(--line);position:relative;animation:mup .35s ease}
+  @keyframes mup{from{opacity:0;transform:translateY(26px)}to{opacity:1;transform:none}}
+  .modal .close{position:absolute;top:14px;right:16px;background:none;border:none;font-size:1.5rem;color:var(--ink-soft);cursor:pointer;line-height:1}
+  .modal .close:hover{color:var(--ink)}
+  .modal-head{display:flex;gap:22px;align-items:center;padding:38px 40px 24px;border-bottom:1px solid var(--line)}
+  .modal-head .initials{width:88px;height:88px;border-radius:50%;background:linear-gradient(135deg,var(--blush),var(--sand));display:flex;align-items:center;justify-content:center;font-family:'Cormorant Garamond',serif;font-size:1.9rem;color:var(--bronze-dark);flex-shrink:0;overflow:hidden}
+  .modal-head h3{font-size:1.9rem}
+  .modal-head .role{font-size:.72rem;letter-spacing:.26em;text-transform:uppercase;color:var(--bronze);margin-top:4px}
+  .modal-head .ig{display:inline-block;margin-top:8px;font-size:.85rem;color:var(--bronze-dark);text-decoration:none;border-bottom:1px solid var(--blush)}
+  .modal-body{padding:26px 40px 38px}
+  .modal-body .bio{color:var(--ink-soft);font-size:.95rem;margin-bottom:18px}
+  .modal-body .socials{display:flex;flex-wrap:wrap;gap:10px;margin-bottom:26px}
+  .modal-body .socials a{display:inline-flex;align-items:center;gap:8px;text-decoration:none;font-size:.74rem;letter-spacing:.18em;text-transform:uppercase;color:var(--bronze-dark);border:1px solid var(--line);padding:9px 16px;transition:border-color .2s,background .2s}
+  .modal-body .socials a:hover{border-color:var(--bronze);background:var(--cream)}
+  .modal-body .socials a .ic{font-size:.95rem;line-height:1}
+  .modal-body h4{font-size:1.2rem;margin-bottom:10px}
+  .modal-body .menu-item{font-size:.93rem}
+  .modal-body .m-note{font-size:.85rem;font-style:italic;color:var(--ink-soft);margin-top:12px}
+  .modal-body .book-row{margin-top:28px;text-align:center}
+  @media(max-width:560px){.modal-head{padding:30px 22px 18px}.modal-body{padding:22px 22px 30px}}
 
-/* about — v7: split layout with imagery, like a designed template rather
-   than a floating paragraph. The photo is decorative (curated stock by
-   theme); the salon's own words stay the focus. */
-.about-split{display:grid;grid-template-columns:5fr 6fr;gap:52px;align-items:center;max-width:960px;margin:0 auto}
-.about-media{position:relative}
-.about-media img{width:100%;aspect-ratio:4/5;object-fit:cover;border-radius:14px;box-shadow:0 24px 60px -28px rgba(0,0,0,.35)}
-.about-media:after{content:"";position:absolute;inset:14px -14px -14px 14px;border:1px solid var(--accent);border-radius:14px;opacity:.45;pointer-events:none;z-index:-1}
-.about-copy .section-label{text-align:left}
-.about-copy h2{text-align:left}
-.about-copy p{color:var(--soft);font-size:1.02rem}
-@media(max-width:760px){
-  .about-split{grid-template-columns:1fr;gap:34px;max-width:560px}
-  .about-media img{aspect-ratio:16/10}
-  .about-copy .section-label,.about-copy h2{text-align:center}
-  .about-copy p{text-align:center}
-}
-.about-inner{max-width:640px;margin:0 auto;text-align:center}
-.about-inner p{color:var(--soft);font-size:1.02rem}
-/* ornament divider under section headings */
-.orn{display:flex;align-items:center;justify-content:center;gap:10px;color:var(--accent);margin:2px 0 14px}
-.orn:before,.orn:after{content:"";width:44px;height:1px;background:currentColor;opacity:.5}
-.orn svg{width:15px;height:15px}
+  .booking{background:var(--sand)}
+  .wizard{max-width:860px;margin:0 auto;background:var(--white);border:1px solid var(--line);box-shadow:0 24px 60px -30px rgba(43,38,36,.25)}
+  .with-chip{display:none;justify-content:center;padding:14px 20px 0}
+  .with-chip.on{display:flex}
+  .with-chip span{display:inline-flex;align-items:center;gap:10px;font-size:.8rem;letter-spacing:.14em;text-transform:uppercase;color:var(--bronze-dark);border:1px dashed var(--bronze);padding:8px 16px}
+  .with-chip button{background:none;border:none;cursor:pointer;color:var(--ink-soft);font-size:1rem;line-height:1}
+  .steps{display:flex;border-bottom:1px solid var(--line)}
+  .steps .st{flex:1;text-align:center;padding:18px 6px;font-size:.68rem;letter-spacing:.22em;text-transform:uppercase;color:var(--ink-soft);border-bottom:2px solid transparent;white-space:nowrap}
+  .steps .st b{display:inline-flex;width:22px;height:22px;border-radius:50%;border:1px solid var(--line);align-items:center;justify-content:center;font-weight:400;margin-right:8px;font-size:.7rem}
+  .steps .st.active{color:var(--bronze-dark);border-bottom-color:var(--bronze)}
+  .steps .st.active b{background:var(--bronze);border-color:var(--bronze);color:var(--white)}
+  .steps .st.done b{background:var(--blush);border-color:var(--blush);color:var(--bronze-dark)}
+  @media(max-width:680px){.steps .st span{display:none}.steps .st b{margin-right:0}}
+  .pane{padding:48px 52px;display:none}
+  .pane.active{display:block;animation:fadeUp .45s ease}
+  @keyframes fadeUp{from{opacity:0;transform:translateY(14px)}to{opacity:1;transform:none}}
+  @media(max-width:680px){.pane{padding:34px 20px}}
+  .pane h3{font-size:1.9rem;margin-bottom:6px}
+  .pane .sub{color:var(--ink-soft);margin-bottom:30px;font-size:.97rem}
+  .pane .cat-tabs{justify-content:flex-start;margin-bottom:22px}
+  .pane .cat-tabs button{padding:8px 14px;font-size:.7rem}
+  .cards{display:grid;grid-template-columns:repeat(3,1fr);gap:14px}
+  @media(max-width:680px){.cards{grid-template-columns:1fr 1fr}}
+  .card{border:1px solid var(--line);padding:18px 16px;cursor:pointer;text-align:left;background:var(--white);transition:border-color .2s,background .2s;position:relative}
+  .card:hover{border-color:var(--bronze)}
+  .card.sel{border-color:var(--bronze);background:var(--cream)}
+  .card.sel::after{content:"✓";position:absolute;top:10px;right:14px;color:var(--bronze);font-size:.9rem}
+  .card .nm{font-family:'Cormorant Garamond',serif;font-size:1.2rem;line-height:1.2;padding-right:18px}
+  .card .dt{font-size:.78rem;color:var(--ink-soft);margin-top:5px}
+  .card .pr{font-size:.83rem;color:var(--bronze-dark);margin-top:2px}
+  .picked{margin-top:22px;font-size:.9rem;color:var(--ink-soft)}
+  .picked b{font-weight:400;color:var(--ink)}
+  .seg{display:inline-flex;border:1px solid var(--line);margin-bottom:28px;flex-wrap:wrap}
+  .seg button{font-family:'Jost',sans-serif;font-weight:300;font-size:.85rem;letter-spacing:.14em;text-transform:uppercase;padding:12px 26px;background:var(--white);border:none;cursor:pointer;color:var(--ink-soft);transition:background .2s,color .2s}
+  .seg button.sel{background:var(--bronze);color:var(--white)}
+  .who{display:flex;align-items:center;gap:14px;flex-wrap:wrap;margin-bottom:28px}
+  .who label{font-size:.72rem;letter-spacing:.26em;text-transform:uppercase;color:var(--ink-soft)}
+  .who select{font-family:'Jost',sans-serif;font-weight:300;font-size:.95rem;color:var(--ink);background:var(--cream);border:1px solid var(--line);border-radius:0;padding:10px 36px 10px 14px;outline:none;-webkit-appearance:none;appearance:none;background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='6'%3E%3Cpath d='M1 1l4 4 4-4' fill='none' stroke='%23a8836a' stroke-width='1.4'/%3E%3C/svg%3E");background-repeat:no-repeat;background-position:right 14px center}
+  .cal-time{display:grid;grid-template-columns:1fr 1fr;gap:36px}
+  @media(max-width:680px){.cal-time{grid-template-columns:1fr}}
+  .cal-head{display:flex;align-items:center;justify-content:space-between;margin-bottom:14px}
+  .cal-head h4{font-size:1.25rem}
+  .cal-head button{background:none;border:1px solid var(--line);width:34px;height:34px;cursor:pointer;color:var(--bronze-dark);font-size:1rem;transition:background .2s}
+  .cal-head button:hover:not(:disabled){background:var(--sand)}
+  .cal-head button:disabled{opacity:.3;cursor:default}
+  .cal-grid{display:grid;grid-template-columns:repeat(7,1fr);gap:4px;text-align:center}
+  .cal-grid .dow{font-size:.68rem;letter-spacing:.1em;color:var(--ink-soft);text-transform:uppercase;padding:6px 0}
+  .cal-grid .day{aspect-ratio:1;display:flex;align-items:center;justify-content:center;font-size:.9rem;cursor:pointer;border:1px solid transparent;background:none;font-family:'Jost',sans-serif;font-weight:300;color:var(--ink)}
+  .cal-grid .day:hover:not(:disabled){border-color:var(--bronze)}
+  .cal-grid .day:disabled{color:#c9beb4;cursor:default}
+  .cal-grid .day.sel{background:var(--bronze);color:var(--white)}
+  .slots-head{font-size:1.25rem;margin-bottom:14px;font-family:'Cormorant Garamond',serif}
+  .slots{display:grid;grid-template-columns:repeat(3,1fr);gap:10px;align-content:start;max-height:340px;overflow-y:auto;padding-right:4px}
+  .slots button{font-family:'Jost',sans-serif;font-weight:300;font-size:.88rem;padding:10px 6px;border:1px solid var(--line);background:var(--white);cursor:pointer;transition:border-color .2s,background .2s;line-height:1.3}
+  .slots button small{display:block;font-size:.68rem;color:var(--ink-soft);letter-spacing:.04em}
+  .slots button:hover{border-color:var(--bronze)}
+  .slots button.sel{background:var(--bronze);border-color:var(--bronze);color:var(--white)}
+  .slots button.sel small{color:rgba(255,255,255,.8)}
+  .slots .empty{grid-column:1/-1;color:var(--ink-soft);font-style:italic;font-size:.92rem}
+  .fields{display:grid;grid-template-columns:1fr 1fr;gap:22px 24px}
+  @media(max-width:680px){.fields{grid-template-columns:1fr}}
+  .field{display:flex;flex-direction:column;gap:8px}
+  .field.full{grid-column:1/-1}
+  .field label{font-size:.72rem;letter-spacing:.26em;text-transform:uppercase;color:var(--ink-soft)}
+  .field label span{text-transform:none;letter-spacing:0;font-style:italic}
+  .field input,.field select,.field textarea{font-family:'Jost',sans-serif;font-weight:300;font-size:1rem;color:var(--ink);background:var(--cream);border:1px solid var(--line);border-radius:0;padding:13px 14px;outline:none;transition:border-color .2s;-webkit-appearance:none;appearance:none;width:100%}
+  .field input:focus,.field select:focus,.field textarea:focus{border-color:var(--bronze)}
+  .field input.errf{border-color:var(--err)}
+  .field textarea{resize:vertical}
+  .ferr{color:var(--err);font-size:.85rem;margin-top:14px;display:none}
+  .summary{background:var(--cream);border:1px solid var(--line);padding:20px 24px;margin-bottom:28px;display:flex;flex-wrap:wrap;gap:8px 32px;font-size:.95rem}
+  .summary div b{display:block;font-weight:400;font-size:.68rem;letter-spacing:.24em;text-transform:uppercase;color:var(--bronze)}
+  .pane-nav{display:flex;justify-content:space-between;align-items:center;margin-top:36px;gap:14px}
+  .pane-nav .spacer{flex:1}
+  .confirmed{text-align:center;padding:60px 40px}
+  .confirmed .bigcheck{width:74px;height:74px;border-radius:50%;border:1px solid var(--bronze);color:var(--bronze);font-size:2rem;display:flex;align-items:center;justify-content:center;margin:0 auto 26px;animation:pop .5s ease}
+  @keyframes pop{0%{transform:scale(.6);opacity:0}70%{transform:scale(1.08)}100%{transform:scale(1);opacity:1}}
+  .confirmed h3{font-size:2.2rem;margin-bottom:10px}
+  .confirmed p{color:var(--ink-soft);max-width:46ch;margin:0 auto 10px}
+  .confirmed .ref{display:inline-block;margin:18px auto 6px;padding:10px 26px;border:1px dashed var(--bronze);font-size:.9rem;letter-spacing:.2em;color:var(--bronze-dark)}
+  .confirmed .sumline{margin-top:16px;font-family:'Cormorant Garamond',serif;font-size:1.35rem;color:var(--ink)}
+  .book-fine{text-align:center;font-size:.82rem;color:var(--ink-soft);margin-top:28px;font-style:italic}
 
-/* services */
-.services{max-width:620px;margin:0 auto}
-.svc-card{background:var(--surface);border:1px solid var(--line);border-radius:12px;padding:38px 30px;text-align:center}
-.svc-card .svc-icon{width:44px;height:44px;margin:0 auto 16px;color:var(--accent)}
-.svc-card h3{font-size:1.15rem;margin-bottom:8px}
-.svc-card p{color:var(--soft);font-size:.92rem;margin:0}
-.svc-list{list-style:none;margin:0;padding:0}
-.svc-list li{display:flex;justify-content:space-between;gap:14px;padding:13px 0;border-bottom:1px dashed var(--line);font-size:.95rem}
-.svc-list li:last-child{border-bottom:none}
-.svc-list .price{font-weight:600;color:var(--accent)}
+  .locations{background:var(--ink);color:var(--cream)}
+  .locations .sec-head h2{color:var(--white)}
+  .locations .sec-head .eyebrow{color:var(--blush)}
+  .loc-grid{display:grid;grid-template-columns:1fr 1fr;gap:28px}
+  .loc-grid.one{grid-template-columns:minmax(0,620px);justify-content:center}
+  @media(max-width:820px){.loc-grid{grid-template-columns:1fr}}
+  .loc{border:1px solid rgba(250,247,243,.18);padding:46px 42px}
+  .loc .city{font-size:.72rem;letter-spacing:.34em;text-transform:uppercase;color:var(--blush);margin-bottom:12px}
+  .loc h3{font-size:1.9rem;color:var(--white);margin-bottom:18px}
+  .loc p{color:rgba(250,247,243,.75);font-size:.97rem}
+  .loc .addr{margin-bottom:22px}
+  .hours{list-style:none;margin:0 0 28px;font-size:.94rem}
+  .hours li{display:flex;justify-content:space-between;padding:7px 0;border-bottom:1px solid rgba(250,247,243,.12)}
+  .hours li span:last-child{color:var(--blush)}
+  .loc a.link{display:inline-block;font-size:.78rem;letter-spacing:.24em;text-transform:uppercase;color:var(--blush);text-decoration:none;border-bottom:1px solid var(--bronze);padding-bottom:4px;margin-right:22px;margin-top:6px}
+  .loc a.link:hover{color:var(--white)}
 
-/* contact */
-#contactSection{background:var(--bg2)}
-.contact-card{max-width:520px;margin:0 auto;background:var(--surface);border:1px solid var(--line);border-radius:14px;padding:38px}
-@media(max-width:520px){.contact-card{padding:26px 20px}}
-.field{margin-bottom:16px}
-.field label{display:block;font-size:.8rem;margin-bottom:6px;color:var(--soft);font-weight:600}
-.field input,.field textarea{width:100%;padding:13px;border:1px solid var(--line);border-radius:6px;font-family:var(--sans);font-size:.95rem;background:var(--bg);color:var(--ink)}
-.field input:focus,.field textarea:focus{outline:2px solid color-mix(in srgb,var(--accent) 55%,transparent);outline-offset:1px;border-color:var(--accent)}
-.field textarea{resize:vertical;min-height:96px}
-.field-err{color:#c25a44;font-size:.78rem;margin-top:5px;display:none}
-.field.invalid input{border-color:#c25a44}
-.field.invalid .field-err{display:block}
-#leadMsg{display:none;margin-top:16px;padding:14px;border-radius:8px;font-size:.9rem;text-align:center;background:var(--bg2)}
-#leadMsg.err{background:color-mix(in srgb,#c25a44 14%,var(--surface));color:var(--ink)}
-#leadMsg.ok{color:var(--ink)}
+  footer{background:var(--ink);color:rgba(250,247,243,.7);padding:56px 0;font-size:.9rem;border-top:1px solid rgba(250,247,243,.12)}
+  .foot{display:flex;justify-content:space-between;align-items:center;gap:24px;flex-wrap:wrap}
+  .foot .logo{color:var(--white);font-size:1.3rem}
+  .foot nav{display:flex;gap:24px;flex-wrap:wrap}
+  .foot nav a{text-decoration:none;letter-spacing:.18em;text-transform:uppercase;font-size:.72rem}
+  .foot nav a:hover{color:var(--white)}
+  .powered{width:100%;text-align:center;font-size:.78rem;color:rgba(250,247,243,.45);margin-top:26px}
+  .powered a{color:rgba(250,247,243,.7)}
 
-/* footer */
-footer{padding:46px 22px 38px;text-align:center;font-size:.85rem;color:var(--soft);border-top:1px solid var(--line)}
-footer .powered{margin-top:10px;font-size:.78rem;letter-spacing:.04em}
-footer .powered a{color:var(--accent);font-weight:600}
-footer .powered a:hover{text-decoration:underline}
-
-.field select{width:100%;padding:13px;border:1px solid var(--line);border-radius:6px;font-family:var(--sans);font-size:.95rem;background:var(--bg);color:var(--ink)}
-.field select:focus{outline:2px solid color-mix(in srgb,var(--accent) 55%,transparent);outline-offset:1px;border-color:var(--accent)}
-.field-2up{display:grid;grid-template-columns:1fr 1fr;gap:12px}
-@media(max-width:440px){.field-2up{grid-template-columns:1fr}}
-.field .hint{font-size:.78rem;color:var(--soft);margin-top:5px}
-.reveal{opacity:0;transform:translateY(18px);transition:opacity .6s ease,transform .6s ease}
-.reveal.in{opacity:1;transform:none}
-@media (prefers-reduced-motion:reduce){.reveal{opacity:1;transform:none;transition:none}}
+  /* loading + not found */
+  #loading{position:fixed;inset:0;background:var(--cream);z-index:200;display:flex;align-items:center;justify-content:center;flex-direction:column;gap:18px;transition:opacity .4s}
+  #loading.gone{opacity:0;pointer-events:none}
+  #loading .dot{width:10px;height:10px;border-radius:50%;background:var(--bronze);animation:pulse 1.2s infinite}
+  @keyframes pulse{0%,100%{transform:scale(.7);opacity:.5}50%{transform:scale(1.2);opacity:1}}
+  #loading p{font-size:.72rem;letter-spacing:.3em;text-transform:uppercase;color:var(--ink-soft)}
+  #notfound{min-height:100vh;display:none;align-items:center;justify-content:center;text-align:center;padding:40px 24px}
+  #notfound.show{display:flex}
+  #notfound h1{font-size:clamp(2.2rem,5vw,3.6rem);margin-bottom:18px}
+  #notfound p{max-width:44ch;margin:0 auto 32px;color:var(--ink-soft);font-size:1.05rem}
+  #notfound .small{font-size:.85rem;text-decoration:underline;color:var(--ink-soft);display:block;margin-top:18px}
 </style>
 </head>
 <body>
 
-<div id="loading">
-  <div class="spinner"></div>
-  <div>Opening the salon&hellip;</div>
-</div>
+<div id="loading"><div class="dot"></div><p>Loading</p></div>
 
-<div id="notFound">
-  <h1>Hmm, we can't find that salon</h1>
-  <p>The link may be mistyped, or this site hasn't been created yet. If it's your salon, you can have a site like this live in about two minutes.</p>
-  <a class="btn btn-accent" href="https://salonvine.com/signup.html">Create your salon's site — free</a>
-  <a href="https://salonvine.com" style="font-size:.85rem;text-decoration:underline;color:var(--soft)">or visit salonvine.com</a>
-</div>
-
-<div id="site">
-  <header class="top">
-    <nav class="topnav">
-      <span class="salon-brand"><img id="brandLogo" class="salon-logo" alt="" src=""><span id="brandName"></span></span>
-      <a href="#contact" class="btn btn-accent">Book now</a>
-    </nav>
-  </header>
-
-  <section class="hero" id="heroSection">
-    <div class="hero-bg" id="heroBg" aria-hidden="true"></div>
-    <div class="container" style="position:relative">
-      <div class="eyebrow">Welcome to</div>
-      <h1 id="heroName"></h1>
-      <div class="rule"></div>
-      <p class="tagline" id="heroTagline" style="display:none"></p>
-      <a href="#contact" class="btn btn-accent">Request an appointment</a>
-    </div>
-  </section>
-
-  <section class="section" id="gallerySection" style="display:none">
-    <div class="container">
-      <span class="section-label">Our work</span>
-      <h2>The gallery</h2>
-      <p class="sub">A few favorites from the chair.</p>
-      <div class="gallery reveal" id="gallery"></div>
-    </div>
-  </section>
-
-  <section class="section" id="aboutSection">
-    <div class="container">
-      <div class="about-split reveal">
-        <div class="about-media" id="aboutMedia">
-          <img id="aboutImg" src="" alt="" loading="lazy">
-        </div>
-        <div class="about-copy">
-          <span class="section-label">About</span>
-          <h2 id="aboutHead"></h2>
-          <div class="orn" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><circle cx="6" cy="6" r="2.6"/><circle cx="6" cy="18" r="2.6"/><path d="M8.2 7.6 20 19M8.2 16.4 20 5" stroke-linecap="round"/></svg></div>
-          <p id="aboutText"></p>
-        </div>
-      </div>
-    </div>
-  </section>
-
-  <section class="section" id="servicesSection" style="display:none">
-    <div class="container">
-      <span class="section-label">Services &amp; prices</span>
-      <h2>The menu</h2>
-      <div class="services reveal" id="servicesBody"></div>
-    </div>
-  </section>
-
-  <section class="section" id="contactSection">
-    <div class="container">
-      <span class="section-label">Book a visit</span>
-      <h2 id="contactHead">Request an appointment</h2>
-      <p class="sub">Send a note and we'll get right back to you to confirm a time.</p>
-      <div class="visit-row" id="visitRow" style="display:none">
-        <span class="visit-item" id="visitHours" style="display:none">
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2" stroke-linecap="round"/></svg>
-          <span id="visitHoursText"></span>
-        </span>
-        <span class="visit-item" id="visitInsta" style="display:none">
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" aria-hidden="true"><rect x="3" y="3" width="18" height="18" rx="5"/><circle cx="12" cy="12" r="4"/><circle cx="17.2" cy="6.8" r="1" fill="currentColor" stroke="none"/></svg>
-          <a id="visitInstaLink" target="_blank" rel="noopener"></a>
-        </span>
-        <span class="visit-item" id="visitLinks" style="display:none"></span>
-      </div>
-      <div class="contact-card reveal" id="contact">
-        <form id="leadForm" novalidate>
-          <div class="field" id="lfName">
-            <label for="leadName">Your name</label>
-            <input type="text" id="leadName" autocomplete="name" required>
-            <div class="field-err">Please tell us your name.</div>
-          </div>
-          <div class="field">
-            <label for="leadPhone">Phone</label>
-            <input type="tel" id="leadPhone" autocomplete="tel">
-          </div>
-          <div class="field" id="lfEmail">
-            <label for="leadEmail">Email</label>
-            <input type="email" id="leadEmail" autocomplete="email">
-            <div class="field-err">Add a phone number or a valid email so we can reach you.</div>
-          </div>
-          <div class="field" id="lfService" style="display:none">
-            <label for="leadService">What are you booking?</label>
-            <select id="leadService"></select>
-          </div>
-          <div class="field" id="lfStylist" style="display:none">
-            <label for="leadStylist">Who would you like?</label>
-            <select id="leadStylist"></select>
-          </div>
-          <div class="field-2up">
-            <div class="field">
-              <label for="leadDate">Preferred date</label>
-              <input type="date" id="leadDate">
-            </div>
-            <div class="field">
-              <label for="leadTime">Preferred time</label>
-              <select id="leadTime"></select>
-            </div>
-          </div>
-          <div class="field">
-            <label for="leadMessage">Anything else? <span style="font-weight:400;text-transform:none">(optional)</span></label>
-            <textarea id="leadMessage" placeholder="e.g. going lighter than last time, and I am tight for time after 4"></textarea>
-            <div class="hint">A date and time here is a request, not a confirmed slot &mdash; the salon will come back to you.</div>
-          </div>
-          <button type="submit" class="btn btn-accent" id="leadBtn" style="width:100%">Send request</button>
-        </form>
-        <div id="leadMsg" role="status"></div>
-      </div>
-    </div>
-  </section>
-
-  <footer>
-    <p id="footName"></p>
-    <p class="powered">Powered by <a href="https://salonvine.com" target="_blank" rel="noopener">Salon Vine</a> — websites for independent salons</p>
-  </footer>
-
-  <!-- sticky mobile booking bar (v2) -->
-  <div id="stickyBook" class="hidden">
-    <a href="#contact" class="btn btn-accent">Request appointment</a>
+<div id="notfound">
+  <div>
+    <h1 id="nfTitle">Hmm, we can't find that salon</h1>
+    <p id="nfText">The link may be mistyped, or this site hasn't been created yet. If it's your salon, you can have a site like this live in about two minutes.</p>
+    <a class="btn solid" href="https://salonvine.com/signup.html">Create your salon's site — free</a>
+    <a class="small" href="https://salonvine.com">or visit salonvine.com</a>
   </div>
 </div>
 
-<!-- gallery lightbox (v2) -->
-<div id="lightbox" role="dialog" aria-modal="true" aria-label="Photo viewer">
-  <img id="lbImg" src="" alt="">
-  <button type="button" class="lb-btn lb-close" id="lbClose" aria-label="Close">&times;</button>
-  <button type="button" class="lb-btn lb-prev" id="lbPrev" aria-label="Previous photo">&larr;</button>
-  <button type="button" class="lb-btn lb-next" id="lbNext" aria-label="Next photo">&rarr;</button>
-  <span class="lb-count" id="lbCount"></span>
+<div id="page" hidden>
+<header>
+  <div class="wrap nav">
+    <a class="logo" href="#top" id="logoMain"></a>
+    <button class="burger" id="burger" aria-label="Menu"><span></span><span></span><span></span></button>
+    <ul class="nav-links" id="navLinks">
+      <li><a href="#services">Services</a></li>
+      <li id="navTeam"><a href="#team">Our Team</a></li>
+      <li><a href="#locations">Find Us</a></li>
+      <li><a class="btn solid" href="#book">Book Now</a></li>
+    </ul>
+  </div>
+</header>
+
+<main id="top">
+
+  <section class="hero">
+    <div class="hero-slides" id="heroSlides" aria-hidden="true"></div>
+    <div class="hero-inner">
+      <p class="eyebrow" id="heroEyebrow"></p>
+      <h1 id="heroTitle"></h1>
+      <p id="heroSub"></p>
+      <div class="actions">
+        <a class="btn solid" href="#book">Book an Appointment</a>
+        <a class="btn" href="#team" id="heroTeamBtn">Meet the Team</a>
+      </div>
+      <p class="cities" id="heroCities"></p>
+      <div class="flourish"></div>
+    </div>
+  </section>
+
+  <div class="stats">
+    <div class="row" id="statsRow"></div>
+  </div>
+
+  <section class="services" id="services">
+    <div class="wrap">
+      <div class="sec-head rv">
+        <p class="eyebrow">The Menu</p>
+        <h2>Services &amp; Pricing</h2>
+        <p id="svcSub">Final pricing can vary with hair length, density, and the look you're after — your stylist will confirm at booking.</p>
+      </div>
+      <div class="cat-tabs rv" id="catTabs"></div>
+      <div class="menu-cols rv" id="menuList"></div>
+      <p class="svc-note rv" id="svcNote" hidden></p>
+    </div>
+  </section>
+
+  <section id="team">
+    <div class="wrap">
+      <div class="sec-head rv">
+        <p class="eyebrow">The Artists</p>
+        <h2>Meet the Team</h2>
+        <p id="teamSub">Tap anyone to see their services and book with them directly.</p>
+      </div>
+      <div class="team-grid rv" id="teamGrid"></div>
+    </div>
+  </section>
+
+  <section class="booking" id="book">
+    <div class="wrap">
+      <div class="sec-head rv">
+        <p class="eyebrow">Book Online</p>
+        <h2>Reserve Your Chair</h2>
+        <p id="bookSub">Pick a service, choose a real opening from the calendar, and you're done.</p>
+      </div>
+      <div class="wizard rv" id="wizard">
+        <div class="with-chip" id="withChip"><span>Booking with <b id="withName" style="font-weight:400"></b> <button type="button" id="withClear" title="Remove stylist">&times;</button></span></div>
+        <div class="steps">
+          <div class="st active" data-step="1"><b>1</b><span>Service</span></div>
+          <div class="st" data-step="2"><b>2</b><span>Date &amp; Time</span></div>
+          <div class="st" data-step="3"><b>3</b><span>Your Details</span></div>
+          <div class="st" data-step="4"><b>4</b><span>Confirmed</span></div>
+        </div>
+
+        <div class="pane active" data-pane="1">
+          <h3>What can we do for you?</h3>
+          <p class="sub">Choose one or more services to get started.</p>
+          <div class="cat-tabs" id="bookTabs"></div>
+          <div class="cards" id="svcCards"></div>
+          <p class="picked" id="picked"></p>
+          <div class="pane-nav">
+            <span class="spacer"></span>
+            <button class="btn solid" id="to2" disabled>Choose Date &rarr;</button>
+          </div>
+        </div>
+
+        <div class="pane" data-pane="2">
+          <h3>When works for you?</h3>
+          <p class="sub">The times shown are real openings from the team's calendars.</p>
+          <div class="who" id="whoRow">
+            <label for="f-stylist">With</label>
+            <select id="f-stylist"></select>
+          </div>
+          <div class="cal-time">
+            <div>
+              <div class="cal-head">
+                <button type="button" id="calPrev">&larr;</button>
+                <h4 id="calTitle"></h4>
+                <button type="button" id="calNext">&rarr;</button>
+              </div>
+              <div class="cal-grid" id="calGrid"></div>
+            </div>
+            <div>
+              <div class="slots-head" id="slotsTitle">Select a day</div>
+              <div class="slots" id="slots"><p class="empty">Pick a date on the calendar to see available times.</p></div>
+            </div>
+          </div>
+          <div class="pane-nav">
+            <button class="btn ghost" data-back="1">&larr; Back</button>
+            <span class="spacer"></span>
+            <button class="btn solid" id="to3" disabled>Your Details &rarr;</button>
+          </div>
+        </div>
+
+        <div class="pane" data-pane="3">
+          <h3>Almost done.</h3>
+          <p class="sub">Tell us who you are and we'll take it from here.</p>
+          <div class="summary" id="sumBar"></div>
+          <div class="fields">
+            <div class="field">
+              <label for="f-name">Your Name</label>
+              <input id="f-name" type="text" autocomplete="name" placeholder="First &amp; last name">
+            </div>
+            <div class="field">
+              <label for="f-phone">Phone</label>
+              <input id="f-phone" type="tel" autocomplete="tel" placeholder="(555) 555-5555">
+            </div>
+            <div class="field full">
+              <label for="f-email">Email <span>(for your confirmation)</span></label>
+              <input id="f-email" type="email" autocomplete="email" placeholder="you@email.com">
+            </div>
+            <div class="field full">
+              <label for="f-notes">Anything else? <span>(optional)</span></label>
+              <textarea id="f-notes" rows="3" placeholder="Hair length, inspiration photos to bring, questions…"></textarea>
+            </div>
+          </div>
+          <p class="ferr" id="formErr">Please add your name and a phone number or email so we can confirm your appointment.</p>
+          <div class="pane-nav">
+            <button class="btn ghost" data-back="2">&larr; Back</button>
+            <span class="spacer"></span>
+            <button class="btn solid" id="submitBtn">Confirm Booking</button>
+          </div>
+        </div>
+
+        <div class="pane" data-pane="4">
+          <div class="confirmed">
+            <div class="bigcheck">✓</div>
+            <h3 id="cHead">You're booked in, <span id="cName"></span>.</h3>
+            <p class="sumline" id="cSummary"></p>
+            <p id="cText"></p>
+            <div class="ref" id="cRef"></div>
+            <p style="font-size:.85rem" id="cFoot"></p>
+          </div>
+        </div>
+      </div>
+      <p class="book-fine rv" id="fineNote" hidden></p>
+    </div>
+  </section>
+
+  <section class="locations" id="locations">
+    <div class="wrap">
+      <div class="sec-head rv">
+        <p class="eyebrow">Find Us</p>
+        <h2 id="locTitle">Visit the Salon</h2>
+      </div>
+      <div class="loc-grid one rv" id="locGrid"></div>
+    </div>
+  </section>
+
+</main>
+
+<footer>
+  <div class="wrap foot">
+    <a class="logo" href="#top" id="logoFoot"></a>
+    <nav id="footNav"></nav>
+    <p id="footCopy"></p>
+    <p class="powered">Powered by <a href="https://salonvine.com" target="_blank" rel="noopener">Salon Vine</a> — websites &amp; booking for independent salons</p>
+  </div>
+</footer>
+
+<div class="mobbar" id="mobbar"><a href="#book">Book an Appointment</a></div>
+
+<div class="modal-bg" id="modalBg">
+  <div class="modal" role="dialog" aria-modal="true">
+    <button class="close" id="modalClose" aria-label="Close">&times;</button>
+    <div class="modal-head">
+      <div class="initials" id="mInit"></div>
+      <div>
+        <h3 id="mName"></h3>
+        <p class="role" id="mRole"></p>
+        <a class="ig" id="mIg" target="_blank" rel="noopener" style="display:none"></a>
+      </div>
+    </div>
+    <div class="modal-body">
+      <p class="bio" id="mBio"></p>
+      <div class="socials" id="mSocials"></div>
+      <h4>Services &amp; Pricing</h4>
+      <div id="mMenu"></div>
+      <p class="m-note" id="mNote"></p>
+      <div class="book-row"><button class="btn solid" id="mBook">Book with <span id="mBookName"></span></button></div>
+    </div>
+  </div>
 </div>
+</div><!-- /page -->
 
 <script>
-'use strict';
-
-/* ---------------- config ---------------- */
-/* Public config reads (?site=slug) stay direct to the backend — no token
-   needed. All writes (booking requests) go through the Salon Vine app's
-   serverless proxy, which adds the token server-side. */
-var SV_EXEC = window.SV_EXEC_OVERRIDE ||
-  'https://script.google.com/macros/s/AKfycbyXCmFCL-HuLEFvZDTsV9fIrYiaRCW06ZuNl1uYR-4DhgaJpmthlUKaAIr8rtau2_g4/exec';
-var SV_LEAD_PROXY = 'https://salonvine-app.netlify.app/.netlify/functions/site-lead-proxy';
-
-/* The registry's public site endpoint returns a fixed set of fields. Anything
-   the owner adds from the portal that isn't in that set — their About text,
-   their other social profiles, their show/hide choices — comes from here.
-   It is a separate, optional call: if it fails the page still renders. */
-var SV_EXTRA = 'https://salonvine-app.netlify.app/.netlify/functions/site-extra';
-var SV_DEPOSIT = 'https://salonvine-app.netlify.app/.netlify/functions/booking-deposit';
-var SV_DEPOSIT_CONFIRM = 'https://salonvine-app.netlify.app/.netlify/functions/deposit-confirm';
-/* ---------------- Supabase (the new backend) ---------------- */
-/* Salons listed here load from Supabase. Every salon NOT listed carries on
-   using Apps Script exactly as before. To put a salon back, delete its slug
-   from this list — that is the whole undo.
-   Note: this changes only what the page DISPLAYS. Booking requests still go
-   to the old backend through SV_LEAD_PROXY, so nothing can be lost here. */
+/* ============================================================
+   DATA: everything comes from Supabase.
+   ============================================================ */
 var SV_SUPABASE_URL = 'https://zdlytaswwvemnlgnonnd.supabase.co';
-var SV_SUPABASE_KEY = 'sb_publishable_RWlZ237RfOdorUJycQs2JQ_pFHiGjMX';
-var SV_SUPABASE_SALONS = ['haller-hair'];
+var SV_SUPABASE_KEY = 'sb_publishable_RWlZ237RfOdorUJycQs2JQ_pFHiGjMX';   /* public key — safe in a browser */
+var STOCK_BASE = 'https://salonvine.com/assets/stock/';
 
-/* Supabase returns tidier data than Apps Script did: prices in whole pence,
-   opening hours as seven rows, the team as records. The page was written
-   against the old shapes, so translate here rather than rewrite the page. */
-function svMoney(v) {
-  if (v === null || v === undefined || v === '') { return ''; }
-  if (typeof v !== 'number') { return String(v); }
-  var whole = Math.floor(v / 100), cents = v % 100;
-  return '$' + whole + (cents ? '.' + (cents < 10 ? '0' : '') + cents : '');
-}
-function svClock(t) {
-  var m = /^(\d{1,2}):(\d{2})/.exec(String(t || ''));
-  if (!m) { return ''; }
-  var h = Number(m[1]), mins = m[2];
-  var ap = h < 12 ? 'am' : 'pm';
-  var h12 = h % 12 === 0 ? 12 : h % 12;
-  return h12 + (mins === '00' ? '' : ':' + mins) + ap;
-}
-function svHoursText(rows) {
-  if (!Array.isArray(rows) || !rows.length) { return ''; }
-  var NAMES = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
-  var ORDER = [1, 2, 3, 4, 5, 6, 0];   /* show Monday first */
-  var by = {};
-  rows.forEach(function (r) { by[Number(r.weekday)] = r; });
-  var parts = [], run = null;
-  function flush() {
-    if (!run) { return; }
-    var label = run.from === run.to ? NAMES[run.from]
-      : NAMES[run.from] + '\u2013' + NAMES[run.to];
-    parts.push(label + ' ' + run.text);
-    run = null;
-  }
-  ORDER.forEach(function (d) {
-    var r = by[d];
-    var text = (!r || r.closed) ? 'closed'
-      : (svClock(r.opens) + '\u2013' + svClock(r.closes));
-    if (run && run.text === text) { run.to = d; } else { flush(); run = { from: d, to: d, text: text }; }
-  });
-  flush();
-  return parts.join(' \u00b7 ');
-}
-function svAdaptSupabase(d) {
-  return {
-    ok: true,
-    name: d.name,
-    slug: d.slug,
-    tagline: d.tagline,
-    about: d.about,
-    theme: d.theme,
-    accent: d.accent,
-    logo: d.logo,
-    heroImage: d.heroImage,
-    heroTitle: d.heroTitle,
-    aboutImage: d.aboutImage,
-    instagram: d.instagram,
-    photos: Array.isArray(d.photos) ? d.photos : [],
-    hours: svHoursText(d.hours),
-    services: (Array.isArray(d.services) ? d.services : []).map(function (s) {
-      return { name: s.name, price: svMoney(s.price), minutes: s.minutes };
-    }),
-    stylists: (Array.isArray(d.team) ? d.team : []).map(function (t) { return t.name; }).filter(Boolean),
-    /* raw records with ids, so the form can make a real booking */
-    _sb: { slug: d.slug, timezone: d.timezone, team: Array.isArray(d.team) ? d.team : [], services: Array.isArray(d.services) ? d.services : [] }
-  };
-}
-function svFromSupabase(slug) {
-  return fetch(SV_SUPABASE_URL + '/rest/v1/rpc/sv_site', {
-    method: 'POST',
-    headers: {
-      'apikey': SV_SUPABASE_KEY,
-      'Authorization': 'Bearer ' + SV_SUPABASE_KEY,
-      'Content-Type': 'application/json'
-    },
-    body: JSON.stringify({ p_slug: slug })
-  }).then(function (res) {
-    if (!res.ok) { throw new Error('supabase HTTP ' + res.status); }
-    return res.json();
-  }).then(function (d) {
-    if (!d || !d.name) { throw new Error('supabase: no salon named ' + slug); }
-    return svAdaptSupabase(d);
-  });
-}
-function svFromAppsScript(slug) {
-  return fetch(SV_EXEC + '?site=' + encodeURIComponent(slug)).then(function (res) {
-    if (!res.ok) { throw new Error('HTTP ' + res.status); }
-    return res.json();
-  });
-}
-/* Match the way the old backend did: ignoring hyphens, so both
-   hallerhair.salonvine.com and haller-hair.salonvine.com find the salon.
-   Returns the proper slug Supabase knows it by, or '' for not-moved-yet. */
-function svCanonicalSlug(slug) {
-  var bare = String(slug || '').replace(/-/g, '');
-  for (var i = 0; i < SV_SUPABASE_SALONS.length; i++) {
-    if (SV_SUPABASE_SALONS[i].replace(/-/g, '') === bare) { return SV_SUPABASE_SALONS[i]; }
-  }
-  return '';
-}
-/* A request that never answers is worse than one that fails outright: the
-   page just spins and the salon looks broken. Every backend call gets a
-   deadline. Soft = carry on without it. Hard = treat it as failed. */
-function svSoftDeadline(p, ms, fallback) {
-  return Promise.race([p, new Promise(function (resolve) {
-    setTimeout(function () { resolve(fallback); }, ms);
-  })]);
-}
-function svHardDeadline(p, ms, label) {
-  return Promise.race([p, new Promise(function (undef, reject) {
-    setTimeout(function () { reject(new Error(label + ' timed out after ' + ms + 'ms')); }, ms);
-  })]);
-}
-/* If Supabase is slow, down, or wrong, the salon still gets its old page. */
-function svLoadSite(slug) {
-  var canonical = svCanonicalSlug(slug);
-  if (!canonical) { return svFromAppsScript(slug); }
-  return svHardDeadline(svFromSupabase(canonical), 6000, 'Supabase').catch(function (e) {
-    if (window.console) { console.warn('Supabase failed, falling back to Apps Script:', e); }
-    return svFromAppsScript(slug);
-  });
-}
-
-
-/* ---------------- themes (kept in sync with signup.html) ---------------- */
+/* Themes (kept in sync with signup.html + the portal editor). */
 var THEMES = {
-  'classic-cream': {label:'Classic Cream', mode:'light', bg:'#faf6f0', bg2:'#f2ece2', surface:'#ffffff', ink:'#211d1a', soft:'#5c5148', accent:'#a8836a'},
-  'midnight':      {label:'Midnight',      mode:'dark',  bg:'#12151f', bg2:'#181c2a', surface:'#1d2231', ink:'#edeff7', soft:'#a9afc4', accent:'#c9a86a'},
-  'rose-gold':     {label:'Rose Gold',     mode:'light', bg:'#faf2f0', bg2:'#f4e4e0', surface:'#ffffff', ink:'#3b2b2a', soft:'#7d635f', accent:'#c0777f'},
-  'sage-spa':      {label:'Sage Spa',      mode:'light', bg:'#f4f7f2', bg2:'#e7efe2', surface:'#ffffff', ink:'#26302a', soft:'#5f7064', accent:'#6f8f74'},
-  'bold-noir':     {label:'Bold Noir',     mode:'dark',  bg:'#151312', bg2:'#1d1a18', surface:'#221e1c', ink:'#f3ede6', soft:'#b3a89e', accent:'#c58a5a'},
-  'ocean':         {label:'Ocean',         mode:'light', bg:'#f2f7f9', bg2:'#e2edf1', surface:'#ffffff', ink:'#1f2d33', soft:'#54676f', accent:'#3e7d92'}
+  'classic-cream': {mode:'light', bg:'#faf7f3', bg2:'#f1eae2', surface:'#ffffff', ink:'#2b2624', soft:'#6b615c', accent:'#a8836a', line:'#e3d9cf', hero:'stock-hero-bright.jpg'},
+  'midnight':      {mode:'dark',  bg:'#12151f', bg2:'#181c2a', surface:'#1d2231', ink:'#edeff7', soft:'#a9afc4', accent:'#c9a86a', line:'#2a3044', hero:'stock-stools.jpg'},
+  'rose-gold':     {mode:'light', bg:'#faf2f0', bg2:'#f4e4e0', surface:'#ffffff', ink:'#3b2b2a', soft:'#7d635f', accent:'#c0777f', line:'#ecd8d3', hero:'stock-hero-bright.jpg'},
+  'sage-spa':      {mode:'light', bg:'#f4f7f2', bg2:'#e7efe2', surface:'#ffffff', ink:'#26302a', soft:'#5f7064', accent:'#6f8f74', line:'#d9e3d4', hero:'stock-welcome.jpg'},
+  'bold-noir':     {mode:'dark',  bg:'#151312', bg2:'#1d1a18', surface:'#221e1c', ink:'#f3ede6', soft:'#b3a89e', accent:'#c58a5a', line:'#2e2825', hero:'stock-barber-cut.jpg'},
+  'ocean':         {mode:'light', bg:'#f2f7f9', bg2:'#e2edf1', surface:'#ffffff', ink:'#1f2d33', soft:'#54676f', accent:'#3e7d92', line:'#d3e1e7', hero:'stock-hero-bright.jpg'}
 };
 
-/* v7: curated stock imagery (assets/stock, Unsplash-licensed) so every
-   site looks designed from second one — template-style, like Google
-   Sites. The owner's own hero upload always wins over the stock hero. */
-var STOCK_BASE = '/assets/stock/';
-var THEME_STOCK = {
-  'classic-cream': {hero:'stock-hero-bright.jpg', about:'stock-cutting.jpg'},
-  'midnight':      {hero:'stock-stools.jpg',      about:'stock-style.jpg'},
-  'rose-gold':     {hero:'stock-hero-bright.jpg', about:'stock-blowout.jpg'},
-  'sage-spa':      {hero:'stock-welcome.jpg',     about:'stock-mirror.jpg'},
-  'bold-noir':     {hero:'stock-barber-cut.jpg',  about:'stock-hero-barber.jpg'},
-  'ocean':         {hero:'stock-hero-bright.jpg', about:'stock-team.jpg'}
-};
-
-/* ---------------- slug from ?s=, /s/<slug> path, or subdomain ---------------- */
-/* v6.1: pretty client URLs — calicuts.salonvine.com serves the
-   cali-cuts site. The backend matches subdomains hyphen-insensitively
-   and returns the canonical slug, so bookings still post correctly. */
-var RESERVED_SUBDOMAINS = ['www', 'portal', 'app', 'mail', 'api', 'admin'];
+/* ---------- slug from ?s=, /s/<slug> path, or subdomain ---------- */
+var RESERVED_SUBDOMAINS = ['www', 'portal', 'app', 'mail', 'api', 'admin', 'salonvine'];
 function subdomainSlug() {
   var m = window.location.hostname.toLowerCase().match(/^([a-z0-9-]+)\.salonvine\.com$/);
   if (!m) { return ''; }
@@ -540,686 +519,512 @@ function subdomainSlug() {
 function currentSlug() {
   var q = new URLSearchParams(window.location.search);
   var s = (q.get('s') || q.get('site') || '').trim();
-  if (!s) {
-    var m = window.location.pathname.match(/\/s\/([a-z0-9-]+)\/?$/i);
-    if (m) { s = m[1]; }
-  }
+  if (!s) { var m = window.location.pathname.match(/\/s\/([a-z0-9-]+)\/?$/i); if (m) { s = m[1]; } }
   if (!s) { s = subdomainSlug(); }
-  return s.toLowerCase().replace(/[^a-z0-9-]/g, '').replace(/\/+$/, '');
+  return s.toLowerCase().replace(/[^a-z0-9-]/g, '');
 }
 
-function esc(s) {
-  return String(s == null ? '' : s).replace(/[&<>"']/g, function (c) {
-    return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c];
-  });
+/* ---------- helpers ---------- */
+function esc(s) { return String(s == null ? '' : s).replace(/[&<>"']/g, function (c) { return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]; }); }
+function el(tag, cls, html) { var d = document.createElement(tag); if (cls) { d.className = cls; } if (html !== undefined) { d.innerHTML = html; } return d; }
+function $(id) { return document.getElementById(id); }
+function initials(name) { return String(name || '').split(' ').map(function (w) { return w[0] || ''; }).slice(0, 2).join('').toUpperCase(); }
+function money(cents, from) {
+  if (cents === null || cents === undefined) { return ''; }
+  var n = Number(cents);
+  if (!n) { return from ? 'by consult' : 'Free'; }
+  var whole = Math.floor(n / 100), c = n % 100;
+  var txt = '$' + whole + (c ? '.' + (c < 10 ? '0' : '') + c : '');
+  return from ? 'from ' + txt : txt;
+}
+function minsText(m) {
+  m = Number(m) || 0;
+  if (!m) { return ''; }
+  if (m < 60) { return m + ' min'; }
+  var h = Math.floor(m / 60), r = m % 60;
+  if (!r) { return h + (h === 1 ? ' hr' : ' hrs'); }
+  if (r === 30) { return h + '.5 hrs'; }
+  return h + ' hr ' + r + ' min';
+}
+function clock(t) {
+  var m = /^(\d{1,2}):(\d{2})/.exec(String(t || ''));
+  if (!m) { return ''; }
+  var h = Number(m[1]), mins = m[2], ap = h < 12 ? 'AM' : 'PM', h12 = h % 12 === 0 ? 12 : h % 12;
+  return h12 + (mins === '00' ? '' : ':' + mins) + ' ' + ap;
+}
+function clockTz(iso, tz) {
+  try { return new Date(iso).toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit', timeZone: tz }); }
+  catch (e) { return new Date(iso).toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' }); }
+}
+function dateInTz(iso, tz) {
+  try { return new Date(iso).toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric', timeZone: tz }); }
+  catch (e) { return new Date(iso).toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric' }); }
+}
+function ymd(d) { return d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0'); }
+function hexToRgb(h) { h = String(h || '').replace('#', ''); if (h.length === 3) { h = h.split('').map(function (c) { return c + c; }).join(''); } var n = parseInt(h, 16); return isNaN(n) || h.length !== 6 ? null : [n >> 16 & 255, n >> 8 & 255, n & 255]; }
+function rgbToHex(r) { return '#' + r.map(function (v) { v = Math.max(0, Math.min(255, Math.round(v))); return (v < 16 ? '0' : '') + v.toString(16); }).join(''); }
+function mix(a, b, t) { var x = hexToRgb(a), y = hexToRgb(b); if (!x || !y) { return a; } return rgbToHex([0, 1, 2].map(function (i) { return x[i] + (y[i] - x[i]) * t; })); }
+function deadline(p, ms, label) {
+  return Promise.race([p, new Promise(function (u, reject) { setTimeout(function () { reject(new Error(label + ' timed out')); }, ms); })]);
 }
 
-/* ---------------- theming ---------------- */
-function applyTheme(themeKey, accentOverride) {
+/* ---------- Supabase calls ---------- */
+function sbHeaders() { return { 'apikey': SV_SUPABASE_KEY, 'Authorization': 'Bearer ' + SV_SUPABASE_KEY, 'Content-Type': 'application/json' }; }
+function sbMessage(text, status) { try { var j = JSON.parse(text); return j.message || j.hint || ('HTTP ' + status); } catch (e) { return 'HTTP ' + status; } }
+function rpc(name, args, ms) {
+  return deadline(fetch(SV_SUPABASE_URL + '/rest/v1/rpc/' + name, { method: 'POST', headers: sbHeaders(), body: JSON.stringify(args || {}) })
+    .then(function (res) { return res.text().then(function (t) { if (!res.ok) { throw new Error(sbMessage(t, res.status)); } return t ? JSON.parse(t) : null; }); }), ms || 10000, name);
+}
+var SALON_ROW = null;
+function salonRow() {
+  if (SALON_ROW) { return Promise.resolve(SALON_ROW); }
+  return deadline(fetch(SV_SUPABASE_URL + '/rest/v1/salon?select=id,timezone&slug=eq.' + encodeURIComponent(SITE.slug), { headers: sbHeaders() })
+    .then(function (r) { return r.json(); }), 8000, 'salon lookup').then(function (rows) {
+      if (!rows || !rows[0]) { throw new Error('salon not found'); }
+      SALON_ROW = rows[0]; return SALON_ROW;
+    });
+}
+
+/* ============================================================
+   THEME
+   ============================================================ */
+function applyTheme(themeKey, accent) {
   var t = THEMES[themeKey] || THEMES['classic-cream'];
+  var a = /^#[0-9a-f]{6}$/i.test(accent || '') ? accent : t.accent;
   var r = document.documentElement.style;
-  r.setProperty('--bg', t.bg);
-  r.setProperty('--bg2', t.bg2);
-  r.setProperty('--surface', t.surface);
+  r.setProperty('--cream', t.bg);
+  r.setProperty('--sand', t.bg2);
+  r.setProperty('--white', t.surface);
   r.setProperty('--ink', t.ink);
-  r.setProperty('--soft', t.soft);
-  var accent = /^#[0-9a-fA-F]{3,8}$/.test(String(accentOverride || '')) ? accentOverride : t.accent;
-  r.setProperty('--accent', accent);
-  r.setProperty('--line', t.mode === 'dark' ? 'rgba(255,255,255,.14)' : 'rgba(80,70,60,.18)');
-  var meta = document.querySelector('meta[name="theme-color"]');
-  if (!meta) {
-    meta = document.createElement('meta');
-    meta.name = 'theme-color';
-    document.head.appendChild(meta);
-  }
-  meta.content = t.bg;
+  r.setProperty('--ink-soft', t.soft);
+  r.setProperty('--line', t.line);
+  r.setProperty('--bronze', a);
+  r.setProperty('--bronze-dark', mix(a, '#000000', 0.18));
+  r.setProperty('--blush', mix(a, t.mode === 'dark' ? '#ffffff' : t.bg, t.mode === 'dark' ? 0.55 : 0.6));
+  $('themeColor').setAttribute('content', a);
+  $('favicon').setAttribute('href', "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Ccircle cx='32' cy='32' r='30' fill='%23" + a.slice(1) + "'/%3E%3C/svg%3E");
+  return t;
 }
 
-/* ---------------- render ---------------- */
-var SITE = null;
+/* ============================================================
+   BUILD THE PAGE FROM THE SUPABASE PAYLOAD
+   ============================================================ */
+var SITE = null;          /* sv_site payload */
+var MENU = {};            /* category -> [service] */
+var TEAM = [];            /* stylists */
+var HOURS = {};           /* weekday -> {opens, closes} or null */
 
-function render(cfg, extra) {
-  extra = extra || {};
-  function flag(k) { return extra[k] === undefined ? true : !!extra[k]; }
-  SITE = cfg;
-  applyTheme(cfg.theme, cfg.accent);
+function build(d) {
+  SITE = d;
+  var theme = applyTheme(d.theme, d.accent);
+  var tz = d.timezone || 'America/New_York';
+  var services = (d.services || []).filter(function (s) { return s && s.name; });
+  TEAM = (d.team || []).filter(function (t) { return t && t.name; });
+  var byId = {}; services.forEach(function (s) { byId[s.id] = s; });
+  TEAM.forEach(function (t) {
+    t.offerMap = {};
+    (t.offers || []).forEach(function (o) { if (byId[o.id]) { t.offerMap[o.id] = o; } });
+    t.offerList = (t.offers || []).filter(function (o) { return byId[o.id]; }).map(function (o) { return { svc: byId[o.id], price: o.price, minutes: o.minutes }; });
+  });
+  (d.hours || []).forEach(function (h) { HOURS[Number(h.weekday)] = h.closed ? null : { opens: h.opens, closes: h.closes }; });
+  services.forEach(function (s) { var c = (s.category || '').trim() || 'Services'; (MENU[c] = MENU[c] || []).push(s); });
 
-  var name = cfg.name || 'Our Salon';
-  document.title = name + ' — book a visit';
-  var descText = name + (cfg.tagline ? ' — ' + cfg.tagline : ' — a beautiful salon, powered by Salon Vine.');
-  var desc = document.querySelector('meta[name="description"]');
-  if (desc) { desc.content = descText; }
+  /* ---- title / meta / schema ---- */
+  var cityText = d.city || '';
+  document.title = d.name + (d.tagline ? ' — ' + d.tagline : '') + (cityText ? ' | ' + cityText : '');
+  document.querySelector('meta[name="description"]').setAttribute('content', (d.about || (d.name + ' — book online.')).slice(0, 160));
+  try {
+    var ld = { '@context': 'https://schema.org', '@type': 'HairSalon', 'name': d.name, 'url': location.href.split('#')[0] };
+    if (d.phone) { ld.telephone = d.phone; }
+    if (d.address) { ld.address = d.address; }
+    var same = [d.instagram ? 'https://www.instagram.com/' + d.instagram + '/' : null, d.facebook].filter(Boolean);
+    if (same.length) { ld.sameAs = same; }
+    var sc = document.createElement('script'); sc.type = 'application/ld+json'; sc.textContent = JSON.stringify(ld); document.head.appendChild(sc);
+  } catch (e) {}
 
-  /* v2: per-salon social/OG tags (title, description, first photo) */
-  function setMeta(attr, key, content) {
-    if (!content) { return; }
-    var el = document.querySelector('meta[' + attr + '="' + key + '"]');
-    if (!el) {
-      el = document.createElement('meta');
-      el.setAttribute(attr, key);
-      document.head.appendChild(el);
-    }
-    el.setAttribute('content', content);
+  /* ---- logo ---- */
+  function logoHTML() {
+    if (d.logo) { return '<img src="' + esc(d.logo) + '" alt="' + esc(d.name) + '">'; }
+    var words = String(d.name).trim().split(/\s+/);
+    if (words.length > 1) { var last = words.pop(); return esc(words.join(' ').toUpperCase()) + '&nbsp;<span>' + esc(last.toUpperCase()) + '</span>'; }
+    return esc(d.name.toUpperCase());
   }
-  setMeta('property', 'og:title', name + ' — book a visit');
-  setMeta('property', 'og:description', descText);
-  setMeta('property', 'og:type', 'website');
-  var firstPhoto = (Array.isArray(cfg.photos) && cfg.photos[0] && /^https?:\/\//.test(String(cfg.photos[0]))) ? String(cfg.photos[0]) : '';
-  if (firstPhoto) { setMeta('property', 'og:image', firstPhoto); }
+  $('logoMain').innerHTML = logoHTML();
+  $('logoFoot').innerHTML = logoHTML();
 
-  /* brand: last word gets the accent, like Salon <span>Vine</span> */
-  var words = name.trim().split(/\s+/);
-  var brandHtml = words.length > 1
-    ? esc(words.slice(0, -1).join(' ')) + ' <em>' + esc(words[words.length - 1]) + '</em>'
-    : '<em>' + esc(name) + '</em>';
-  document.getElementById('brandName').innerHTML = brandHtml;
-  document.getElementById('heroName').textContent = cfg.heroTitle || name;
-  document.getElementById('footName').textContent = '© ' + new Date().getFullYear() + ' ' + name;
+  /* ---- hero ---- */
+  $('heroEyebrow').textContent = d.tagline || 'Welcome';
+  $('heroTitle').innerHTML = d.heroTitle ? String(d.heroTitle).replace(/<(?!\/?em>)[^>]*>/g, '') : 'Beauty, crafted with <em>intention</em>.';
+  $('heroSub').textContent = d.about || ('Welcome to ' + d.name + '. Book your next appointment online in under a minute.');
+  $('heroCities').innerHTML = cityText ? '<b>' + esc(cityText) + '</b>' : '';
+  var photos = (d.photos || []).filter(Boolean);
+  var heroPhotos = photos.length ? photos.slice(0, 5) : (d.heroImage ? [d.heroImage] : [STOCK_BASE + theme.hero]);
+  var slides = $('heroSlides');
+  heroPhotos.forEach(function (p, i) { var s = el('div', 'slide'); s.style.backgroundImage = 'url("' + p + '")'; s.style.animationDelay = (i * 4) + 's'; slides.appendChild(s); });
+  if (heroPhotos.length === 1) { slides.classList.add('single'); }
+  if (!TEAM.length) { $('heroTeamBtn').hidden = true; $('navTeam').hidden = true; $('team').hidden = true; }
 
-  /* v6.3: owner-uploaded logo + hero background (portal editor).
-     Only our Drive-hosted URLs ever reach here (server-sanitized). */
-  if (cfg.logo && /^https:\/\/lh3\.googleusercontent\.com\//.test(String(cfg.logo))) {
-    var lg = document.getElementById('brandLogo');
-    lg.src = String(cfg.logo);
-    lg.alt = name + ' logo';
-    lg.style.display = 'inline-block';
-  }
-  /* v7: hero background — the owner's upload when they have one, a
-     theme-matched stock shot otherwise. Every salon opens with a real
-     image now; "bland by default" is over. */
-  var stock = THEME_STOCK[cfg.theme] || THEME_STOCK['classic-cream'];
-  var heroUrl = '';
-  if (cfg.heroImage && /^https:\/\/lh3\.googleusercontent\.com\//.test(String(cfg.heroImage))) {
-    heroUrl = String(cfg.heroImage).replace(/"/g, '');
-  } else {
-    heroUrl = STOCK_BASE + stock.hero;
-  }
-  document.getElementById('heroSection').classList.add('has-img');
-  document.getElementById('heroBg').style.backgroundImage = 'url("' + heroUrl + '")';
+  /* ---- stats ---- */
+  var stats = [];
+  if (TEAM.length) { stats.push([String(TEAM.length), TEAM.length === 1 ? 'Artist' : 'Artists']); }
+  stats.push([String(services.length), 'Services']);
+  var openDays = Object.keys(HOURS).filter(function (k) { return HOURS[k]; }).length;
+  if (openDays) { stats.push([String(openDays), 'Days a week']); }
+  stats.push(['Online', 'Booking 24/7']);
+  while (stats.length < 4) { stats.push(['Real', 'Openings, live']); }
+  stats.slice(0, 4).forEach(function (st) { $('statsRow').appendChild(el('div', 'cell', '<div class="n">' + esc(st[0]) + '</div><div class="l">' + esc(st[1]) + '</div>')); });
 
-  if (cfg.tagline) {
-    var tg = document.getElementById('heroTagline');
-    tg.textContent = cfg.tagline;
-    tg.style.display = 'block';
-  }
-
-  /* gallery */
-  var photos = Array.isArray(cfg.photos) ? cfg.photos.filter(function (u) {
-    return /^https?:\/\//.test(String(u));
-  }) : [];
-  if (photos.length && flag('showGallery')) {
-    var g = document.getElementById('gallery');
-    g.innerHTML = photos.map(function (u, i) {
-      return '<button type="button" class="shot" data-idx="' + i + '" aria-label="View photo ' + (i + 1) + ' full screen">' +
-        '<img src="' + esc(u) + '" alt="' + esc(name) + ' — work ' + (i + 1) + '" loading="lazy"></button>';
-    }).join('');
-    document.getElementById('gallerySection').style.display = 'block';
-    initLightbox(photos, name);
-  }
-
-  /* about — v7: split layout with a decorative theme-matched photo.
-     v7.1: the owner's own About photo (cfg.aboutImage, server-sanitized
-     Drive URL) wins over the stock shot. */
-  var aImg = document.getElementById('aboutImg');
-  if (cfg.aboutImage && /^https:\/\/lh3\.googleusercontent\.com\//.test(String(cfg.aboutImage))) {
-    aImg.src = String(cfg.aboutImage);
-  } else {
-    aImg.src = STOCK_BASE + stock.about;
-  }
-  aImg.alt = '';
-  document.getElementById('aboutHead').textContent = 'A little about us';
-  var aboutEl = document.getElementById('aboutText');
-  var ownAbout = String(extra.about || '').trim();
-  if (ownAbout) {
-    /* Their own words, with paragraph breaks kept. textContent per line so
-       nothing they type can inject markup. */
-    aboutEl.textContent = '';
-    ownAbout.split(/\n\s*\n/).forEach(function (para, i) {
-      var p = i === 0 ? aboutEl : document.createElement('p');
-      p.textContent = para.replace(/\s*\n\s*/g, ' ').trim();
-      if (i > 0) { aboutEl.parentNode.insertBefore(p, aboutEl.nextSibling); }
+  /* ---- menu ---- */
+  var cats = Object.keys(MENU);
+  var tabsEl = $('catTabs'), listEl = $('menuList');
+  function renderMenu(cat) {
+    listEl.innerHTML = '';
+    MENU[cat].forEach(function (s) {
+      var row = el('div', 'menu-item');
+      row.appendChild(el('span', 'n', esc(s.name)));
+      row.appendChild(el('span', 'd', esc(minsText(s.minutes))));
+      row.appendChild(el('span', 'p', esc(money(s.price, s['from']))));
+      listEl.appendChild(row);
     });
-  } else {
-    aboutEl.textContent =
-      name + ' is an independent salon that cares about the details — great work, honest advice, ' +
-      'and appointments that run on time. ' + (cfg.tagline ? '' : 'Come sit in the chair and see for yourself.');
   }
+  if (cats.length > 1) {
+    cats.forEach(function (cat, i) {
+      var b = el('button', i === 0 ? 'sel' : '', esc(cat)); b.type = 'button';
+      b.addEventListener('click', function () { tabsEl.querySelectorAll('button').forEach(function (x) { x.classList.remove('sel'); }); b.classList.add('sel'); renderMenu(cat); });
+      tabsEl.appendChild(b);
+    });
+  }
+  if (cats.length) { renderMenu(cats[0]); } else { listEl.innerHTML = '<p class="svc-note">The menu is on its way — call to book in the meantime.</p>'; }
+  if (d.hoursNote) { $('svcNote').textContent = d.hoursNote; $('svcNote').hidden = false; }
 
-  /* v2: services & prices — rendered from config.services, hidden if empty */
-  var services = (Array.isArray(cfg.services) ? cfg.services : []).filter(function (s) {
-    return s && String(s.name || '').trim();
+  /* ---- team ---- */
+  var grid = $('teamGrid');
+  function avatarHTML(st) {
+    if (st.photo) { return '<div class="initials"><img src="' + esc(st.photo) + '" alt="' + esc(st.name) + '" loading="lazy"></div>'; }
+    return '<div class="initials">' + esc(initials(st.name)) + '</div>';
+  }
+  TEAM.forEach(function (st) {
+    var card = el('div', 'member');
+    card.innerHTML = avatarHTML(st) + '<h3>' + esc(st.name) + '</h3><p class="role">' + esc(st.role || 'Stylist') + '</p><p>' + esc(st.specialty || '') + '</p>' +
+      '<span class="view">Services &amp; Booking</span>' +
+      '<span class="mode">' + (st.mode === 'request' ? 'Request to book' : 'Instant booking') + '</span>';
+    card.addEventListener('click', function () { openModal(st); });
+    grid.appendChild(card);
   });
-  var body = document.getElementById('servicesBody');
-  if (services.length) {
-    body.innerHTML = '<div class="svc-card" style="text-align:left"><ul class="svc-list">' +
-      services.map(function (s) {
-        var pr = flag('servicesVisual') ? esc(s.price || '') : '';
-        return '<li><span>' + esc(s.name || '') + '</span><span class="price">' + pr + '</span></li>';
-      }).join('') + '</ul></div>';
-    document.getElementById('servicesSection').style.display = 'block';
-  } else {
-    document.getElementById('servicesSection').style.display = 'none';
-  }
 
-  document.getElementById('contactHead').textContent = 'Request an appointment';
+  /* ---- fine print ---- */
+  if (d.cancelNote) { $('fineNote').textContent = d.cancelNote; $('fineNote').hidden = false; }
 
-  /* Offer the salon's real menu instead of a blank box. A picked service is
-     what makes a request actionable for the owner — before this, every
-     booking arrived as a paragraph of free text with no service and no time. */
-  var svcSel = document.getElementById('leadService');
-  if (services.length) {
-    svcSel.innerHTML = '<option value="">Choose a service&hellip;</option>' +
-      services.map(function (x) {
-        var label = x.name + ((x.price && flag('servicesVisual')) ? ' — ' + x.price : '');
-        return '<option value="' + esc(x.name) + '">' + esc(label) + '</option>';
-      }).join('') + '<option value="__other">Something else / not sure</option>';
-    document.getElementById('lfService').style.display = 'block';
-  }
-
-  /* Stylist choice only appears when the salon actually lists people. */
-  var team = (Array.isArray(cfg.stylists) ? cfg.stylists : []).filter(function (n) {
-    return String(n || '').trim();
+  /* ---- location ---- */
+  var lg = $('locGrid');
+  var DAYS = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
+  var hoursRows = [];
+  [1, 2, 3, 4, 5, 6, 0].forEach(function (wd) {
+    var h = HOURS[wd]; var text = h ? clock(h.opens) + ' – ' + clock(h.closes) : 'Closed';
+    var last = hoursRows[hoursRows.length - 1];
+    if (last && last.text === text) { last.to = wd; } else { hoursRows.push({ from: wd, to: wd, text: text }); }
   });
-  if (team.length && flag('showTeam')) {
-    var stySel = document.getElementById('leadStylist');
-    stySel.innerHTML = '<option value="">No preference</option>' +
-      team.map(function (n) { return '<option value="' + esc(n) + '">' + esc(n) + '</option>'; }).join('');
-    document.getElementById('lfStylist').style.display = 'block';
-  }
-
-  /* Half-hour slots, 8am–7pm. Deliberately NOT checked against real
-     availability — there is no calendar yet, and showing a time as bookable
-     when nothing holds it is a lie the client only discovers later. */
-  var timeSel = document.getElementById('leadTime');
-  var slots = ['<option value="">Any time</option>'];
-  for (var hh = 8; hh <= 19; hh++) {
-    for (var mm = 0; mm < 60; mm += 30) {
-      var h12 = hh % 12 === 0 ? 12 : hh % 12;
-      var ap = hh < 12 ? 'am' : 'pm';
-      var lab = h12 + ':' + (mm === 0 ? '00' : '30') + ap;
-      slots.push('<option value="' + lab + '">' + lab + '</option>');
-    }
-  }
-  timeSel.innerHTML = slots.join('');
-
-  /* No past dates, nothing beyond 90 days out. */
-  var dEl = document.getElementById('leadDate');
-  var today = new Date();
-  dEl.min = today.toISOString().slice(0, 10);
-  dEl.max = new Date(today.getTime() + 90 * 864e5).toISOString().slice(0, 10);
-
-  /* v2: hours + instagram in the contact section */
-  var hours = String(cfg.hours || '').trim();
-  var insta = String(cfg.instagram || '').replace(/^@+/, '').trim();
-  if (hours) {
-    document.getElementById('visitHoursText').textContent = hours;
-    document.getElementById('visitHours').style.display = 'flex';
-  }
-  if (insta) {
-    var il = document.getElementById('visitInstaLink');
-    il.textContent = '@' + insta;
-    il.href = 'https://instagram.com/' + encodeURIComponent(insta);
-    document.getElementById('visitInsta').style.display = 'flex';
-  }
-  /* Other places they live online. Stored as bare handles, so the URL is
-     built here — that way a stored value can never be a javascript: link. */
-  var SOCIAL = [
-    { k: 'facebook',  label: 'Facebook',  url: function (h) { return 'https://facebook.com/' + encodeURIComponent(h); } },
-    { k: 'twitter',   label: 'X',         url: function (h) { return 'https://x.com/' + encodeURIComponent(h); } },
-    { k: 'pinterest', label: 'Pinterest', url: function (h) { return 'https://pinterest.com/' + encodeURIComponent(h); } },
-    { k: 'yelp',      label: 'Yelp',      url: function (h) { return 'https://yelp.com/biz/' + encodeURIComponent(h); } }
-  ];
+  var hoursHTML = hoursRows.map(function (r) { var label = r.from === r.to ? DAYS[r.from] : DAYS[r.from] + ' – ' + DAYS[r.to]; return '<li><span>' + label + '</span><span>' + esc(r.text) + '</span></li>'; }).join('');
   var links = [];
-  SOCIAL.forEach(function (sn) {
-    var h = String(extra[sn.k] || '').trim();
-    if (h) { links.push({ href: sn.url(h), text: sn.label }); }
-  });
-  var ext = String(extra.externalWebsite || '').trim();
-  if (/^https?:\/\//i.test(ext)) {
-    links.push({ href: ext, text: ext.replace(/^https?:\/\/(www\.)?/i, '').replace(/\/+$/, '') });
-  }
-  if (links.length) {
-    var box = document.getElementById('visitLinks');
-    box.textContent = '';
-    links.forEach(function (l, i) {
-      if (i) { box.appendChild(document.createTextNode(' · ')); }
-      var a = document.createElement('a');
-      a.href = l.href; a.target = '_blank'; a.rel = 'noopener';
-      a.textContent = l.text;
-      box.appendChild(a);
-    });
-    box.style.display = 'inline-flex';
-  }
+  if (d.address) { links.push(['Directions', 'https://maps.google.com/?q=' + encodeURIComponent(d.address)]); }
+  if (d.phone) { links.push([d.phone, 'tel:' + String(d.phone).replace(/[^\d+]/g, '')]); }
+  if (d.instagram) { links.push(['Instagram', 'https://www.instagram.com/' + d.instagram + '/']); }
+  var card = el('div', 'loc');
+  card.innerHTML = '<p class="city">' + esc(cityText || 'Our salon') + '</p><h3>' + esc(d.name) + '</h3>' +
+    (d.address ? '<p class="addr">' + esc(d.address) + '</p>' : '<p class="addr">Address coming soon — call or book online.</p>') +
+    (d.hours && d.hours.length ? '<ul class="hours">' + hoursHTML + '</ul>' : '') +
+    links.map(function (k) { var ext = k[1].indexOf('http') === 0; return '<a class="link" href="' + esc(k[1]) + '"' + (ext ? ' target="_blank" rel="noopener"' : '') + '>' + esc(k[0]) + '</a>'; }).join('');
+  lg.appendChild(card);
+  if (!d.address && !(d.hours && d.hours.length) && !d.phone) { $('locations').hidden = true; }
 
-  if (hours || insta || links.length) { document.getElementById('visitRow').style.display = 'flex'; }
+  /* ---- footer ---- */
+  var fl = [['Services', '#services']];
+  if (TEAM.length) { fl.push(['Team', '#team']); }
+  fl.push(['Book', '#book'], ['Find Us', '#locations']);
+  if (d.instagram) { fl.push(['Instagram', 'https://www.instagram.com/' + d.instagram + '/']); }
+  if (d.facebook) { fl.push(['Facebook', d.facebook]); }
+  fl.push(['Staff', 'https://portal.salonvine.com/p/' + encodeURIComponent(d.slug) + '/']);
+  $('footNav').innerHTML = fl.map(function (k) { var ext = k[1].indexOf('http') === 0; return '<a href="' + esc(k[1]) + '"' + (ext ? ' target="_blank" rel="noopener"' : '') + '>' + esc(k[0]) + '</a>'; }).join('');
+  $('footCopy').innerHTML = '&copy; ' + new Date().getFullYear() + ' ' + esc(d.name);
 
-  /* v2: sticky mobile booking bar — appears after the hero, hides
-     while the booking form itself is on screen */
-  initStickyBar();
+  /* ---- reveal, nav, mobile bar ---- */
+  var io = new IntersectionObserver(function (entries) { entries.forEach(function (e) { if (e.isIntersecting) { e.target.classList.add('in'); io.unobserve(e.target); } }); }, { threshold: .08 });
+  document.querySelectorAll('.rv').forEach(function (x) { io.observe(x); });
+  $('burger').addEventListener('click', function () { $('navLinks').classList.toggle('open'); });
+  $('navLinks').querySelectorAll('a').forEach(function (a) { a.addEventListener('click', function () { $('navLinks').classList.remove('open'); }); });
+  $('mobbar').classList.add('show');
+  new IntersectionObserver(function (entries) { entries.forEach(function (e) { $('mobbar').classList.toggle('show', !e.isIntersecting); }); }, { threshold: .05 }).observe($('book'));
 
-  document.getElementById('loading').style.display = 'none';
-  document.getElementById('site').style.display = 'block';
-
-  /* reveal on scroll */
-  var revealEls = document.querySelectorAll('.reveal');
-  if ('IntersectionObserver' in window) {
-    var io = new IntersectionObserver(function (entries) {
-      entries.forEach(function (e) {
-        if (e.isIntersecting) { e.target.classList.add('in'); io.unobserve(e.target); }
-      });
-    }, { threshold: 0.12 });
-    revealEls.forEach(function (el) { io.observe(el); });
-  } else {
-    revealEls.forEach(function (el) { el.classList.add('in'); });
-  }
+  setupBooking(services, tz);
 }
 
-/* ---------------- v2: gallery lightbox (no libraries) ---------------- */
-var LB = { photos: [], idx: 0, name: '' };
-
-function initLightbox(photos, salonName) {
-  LB.photos = photos;
-  LB.name = salonName;
-  var lb = document.getElementById('lightbox');
-
-  Array.prototype.forEach.call(document.querySelectorAll('.gallery .shot'), function (btn) {
-    btn.addEventListener('click', function () {
-      openLightbox(Number(btn.getAttribute('data-idx')) || 0);
-    });
+/* ============================================================
+   STYLIST MODAL
+   ============================================================ */
+var currentStylist = null;
+function openModal(st) {
+  currentStylist = st;
+  var mi = $('mInit');
+  if (st.photo) { mi.innerHTML = '<img src="' + esc(st.photo) + '" alt="' + esc(st.name) + '">'; } else { mi.textContent = initials(st.name); }
+  $('mName').textContent = st.name;
+  $('mRole').textContent = st.role || 'Stylist';
+  var ig = $('mIg');
+  if (st.instagram) { ig.style.display = 'inline-block'; ig.textContent = '@' + st.instagram; ig.href = 'https://www.instagram.com/' + st.instagram + '/'; } else { ig.style.display = 'none'; }
+  $('mBio').textContent = st.bio || ((st.specialty ? st.specialty + '. ' : '') + 'Book online and ' + st.name.split(' ')[0] + ' will take it from there.');
+  var soc = $('mSocials'); soc.innerHTML = '';
+  function socBtn(href, label) { return '<a href="' + esc(href) + '" target="_blank" rel="noopener"><span class="ic">✦</span>' + esc(label) + '</a>'; }
+  if (st.instagram) { soc.innerHTML += socBtn('https://www.instagram.com/' + st.instagram + '/', 'See ' + st.name.split(' ')[0] + "'s work"); }
+  if (SITE.instagram) { soc.innerHTML += socBtn('https://www.instagram.com/' + SITE.instagram + '/', 'Salon Instagram'); }
+  if (SITE.facebook) { soc.innerHTML += socBtn(SITE.facebook, 'Salon Facebook'); }
+  var mm = $('mMenu'); mm.innerHTML = '';
+  st.offerList.forEach(function (o) {
+    var row = el('div', 'menu-item');
+    row.appendChild(el('span', 'n', esc(o.svc.name)));
+    row.appendChild(el('span', 'd', esc(minsText(o.minutes))));
+    row.appendChild(el('span', 'p', esc(money(o.price, o.svc['from']))));
+    mm.appendChild(row);
   });
-  document.getElementById('lbClose').addEventListener('click', closeLightbox);
-  document.getElementById('lbPrev').addEventListener('click', function (e) { e.stopPropagation(); stepLightbox(-1); });
-  document.getElementById('lbNext').addEventListener('click', function (e) { e.stopPropagation(); stepLightbox(1); });
-  /* tap anywhere outside the arrows/img chrome closes */
-  lb.addEventListener('click', function (e) {
-    if (e.target === lb || e.target.id === 'lbImg') { closeLightbox(); }
-  });
-  document.addEventListener('keydown', function (e) {
-    if (!lb.classList.contains('open')) { return; }
-    if (e.key === 'Escape') { closeLightbox(); }
-    else if (e.key === 'ArrowLeft') { stepLightbox(-1); }
-    else if (e.key === 'ArrowRight') { stepLightbox(1); }
-  });
-}
-
-function openLightbox(i) {
-  LB.idx = i;
-  syncLightbox();
-  document.getElementById('lightbox').classList.add('open');
+  var note = $('mNote');
+  note.textContent = st.offerList.length ? (st.mode === 'request' ? st.name.split(' ')[0] + ' confirms each request personally — you\'ll hear back by email.' : '') : 'Menu & pricing coming soon — book a consultation to plan your look.';
+  note.style.display = note.textContent ? 'block' : 'none';
+  $('mBookName').textContent = st.name.split(' ')[0];
+  $('modalBg').classList.add('open');
   document.body.style.overflow = 'hidden';
-  document.getElementById('lbClose').focus();
 }
+function closeModal() { $('modalBg').classList.remove('open'); document.body.style.overflow = ''; }
+$('modalClose').addEventListener('click', closeModal);
+$('modalBg').addEventListener('click', function (e) { if (e.target === $('modalBg')) { closeModal(); } });
+document.addEventListener('keydown', function (e) { if (e.key === 'Escape') { closeModal(); } });
 
-function closeLightbox() {
-  document.getElementById('lightbox').classList.remove('open');
-  document.body.style.overflow = '';
-}
+/* ============================================================
+   BOOKING WIZARD — real openings, real bookings
+   ============================================================ */
+function setupBooking(services, tz) {
+  var state = { services: [], stylist: null, date: null, slot: null, cat: null };
+  var svcWrap = $('svcCards'), to2 = $('to2'), to3 = $('to3'), bookTabs = $('bookTabs'), picked = $('picked');
+  var stySel = $('f-stylist'), chip = $('withChip');
 
-function stepLightbox(delta) {
-  var n = LB.photos.length;
-  if (!n) { return; }
-  LB.idx = (LB.idx + delta + n) % n;
-  syncLightbox();
-}
-
-function syncLightbox() {
-  var img = document.getElementById('lbImg');
-  img.src = LB.photos[LB.idx];
-  img.alt = LB.name + ' — photo ' + (LB.idx + 1) + ' of ' + LB.photos.length;
-  document.getElementById('lbCount').textContent = (LB.idx + 1) + ' / ' + LB.photos.length;
-  var multi = LB.photos.length > 1;
-  document.getElementById('lbPrev').style.display = multi ? 'flex' : 'none';
-  document.getElementById('lbNext').style.display = multi ? 'flex' : 'none';
-}
-
-/* ---------------- v2: sticky mobile booking bar ---------------- */
-function initStickyBar() {
-  var bar = document.getElementById('stickyBook');
-  if (!bar) { return; }
-  document.body.classList.add('has-sticky');
-  var hero = document.querySelector('.hero');
-  var contact = document.getElementById('contactSection');
-  var pastHero = false;
-  var contactVisible = false;
-  function sync() {
-    bar.classList.toggle('hidden', !pastHero || contactVisible);
+  /* stylist dropdown (any / each) */
+  function fillStylists() {
+    stySel.innerHTML = '<option value="">First available</option>' + TEAM.map(function (t) { return '<option value="' + esc(t.id) + '">' + esc(t.name) + '</option>'; }).join('');
+    if (!TEAM.length) { $('whoRow').hidden = true; }
   }
-  if ('IntersectionObserver' in window && hero && contact) {
-    var ioHero = new IntersectionObserver(function (entries) {
-      entries.forEach(function (e) { pastHero = !e.isIntersecting; });
-      sync();
-    }, { threshold: 0.1 });
-    ioHero.observe(hero);
-    var ioContact = new IntersectionObserver(function (entries) {
-      entries.forEach(function (e) { contactVisible = e.isIntersecting; });
-      sync();
-    }, { threshold: 0.15 });
-    ioContact.observe(contact);
-  } else {
-    pastHero = true;
-    sync();
+  fillStylists();
+  function setStylist(st) {
+    state.stylist = st || null;
+    stySel.value = st ? st.id : '';
+    if (st) { $('withName').textContent = st.name; chip.classList.add('on'); } else { chip.classList.remove('on'); }
+    /* her menu may differ from the salon menu */
+    state.services = state.services.filter(function (s) { return offered(s); });
+    renderCards();
+    if (state.date) { loadSlots(); }
   }
+  function offered(s) { return !state.stylist || !state.stylist.offerList.length || !!state.stylist.offerMap[s.id]; }
+  function priceFor(s) { var o = state.stylist && state.stylist.offerMap[s.id]; return o ? o.price : s.price; }
+  function minsFor(s) { var o = state.stylist && state.stylist.offerMap[s.id]; return o ? o.minutes : s.minutes; }
+  $('withClear').addEventListener('click', function () { setStylist(null); });
+  stySel.addEventListener('change', function () {
+    var st = null; TEAM.forEach(function (t) { if (t.id === stySel.value) { st = t; } });
+    setStylist(st);
+  });
+  $('mBook').addEventListener('click', function () {
+    if (currentStylist) { setStylist(currentStylist); }
+    closeModal(); goStep(1);
+    $('book').scrollIntoView({ behavior: 'smooth' });
+  });
+
+  /* step 1: category tabs + multi-select cards */
+  var cats = Object.keys(MENU);
+  state.cat = cats[0] || null;
+  function renderTabs() {
+    bookTabs.innerHTML = '';
+    var visible = cats.filter(function (c) { return MENU[c].some(offered); });
+    if (visible.length < 2) { return; }
+    if (visible.indexOf(state.cat) === -1) { state.cat = visible[0]; }
+    visible.forEach(function (c) {
+      var b = el('button', c === state.cat ? 'sel' : '', esc(c)); b.type = 'button';
+      b.addEventListener('click', function () { state.cat = c; renderCards(); });
+      bookTabs.appendChild(b);
+    });
+  }
+  function renderCards() {
+    renderTabs();
+    svcWrap.innerHTML = '';
+    var list = services.filter(offered).filter(function (s) { return cats.length < 2 || (s.category || 'Services') === state.cat || !MENU[state.cat]; });
+    if (!list.length) { svcWrap.innerHTML = '<p class="picked">No services listed yet — call the salon to book.</p>'; }
+    list.forEach(function (s) {
+      var on = state.services.some(function (x) { return x.id === s.id; });
+      var c = el('div', 'card' + (on ? ' sel' : ''), '<div class="nm">' + esc(s.name) + '</div><div class="dt">' + esc(minsText(minsFor(s))) + '</div><div class="pr">' + esc(money(priceFor(s), s['from'])) + '</div>');
+      c.addEventListener('click', function () {
+        var i = state.services.findIndex(function (x) { return x.id === s.id; });
+        if (i === -1) { state.services.push(s); } else { state.services.splice(i, 1); }
+        state.date = null; state.slot = null; to3.disabled = true;
+        renderCards();
+      });
+      svcWrap.appendChild(c);
+    });
+    var total = state.services.reduce(function (a, s) { return a + (Number(minsFor(s)) || 0); }, 0);
+    picked.innerHTML = state.services.length
+      ? 'Selected: <b>' + state.services.map(function (s) { return esc(s.name); }).join(', ') + '</b>' + (total ? ' · about ' + esc(minsText(total)) : '')
+      : '';
+    to2.disabled = !state.services.length;
+  }
+  renderCards();
+  to2.addEventListener('click', function () { if (state.services.length) { goStep(2); renderCal(); } });
+
+  /* step navigation */
+  function goStep(n) {
+    document.querySelectorAll('.pane').forEach(function (p) { p.classList.toggle('active', p.dataset.pane === String(n)); });
+    document.querySelectorAll('.steps .st').forEach(function (s) { var k = Number(s.dataset.step); s.classList.toggle('active', k === n); s.classList.toggle('done', k < n); });
+  }
+  document.querySelectorAll('[data-back]').forEach(function (b) { b.addEventListener('click', function () { goStep(Number(b.dataset.back)); }); });
+
+  /* step 2: calendar */
+  var today = new Date(); today.setHours(0, 0, 0, 0);
+  var view = new Date(today.getFullYear(), today.getMonth(), 1);
+  var horizon = new Date(today.getTime() + (Number(SITE.horizonDays) || 60) * 86400000);
+  var calGrid = $('calGrid'), calTitle = $('calTitle'), calPrev = $('calPrev'), calNext = $('calNext');
+  var MONTHS = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'];
+  var DOWS = ['Su', 'Mo', 'Tu', 'We', 'Th', 'Fr', 'Sa'];
+  function monthIndex(d) { return d.getFullYear() * 12 + d.getMonth(); }
+  function sameDay(a, b) { return a && b && a.getTime() === b.getTime(); }
+  function renderCal() {
+    calTitle.textContent = MONTHS[view.getMonth()] + ' ' + view.getFullYear();
+    calPrev.disabled = monthIndex(view) <= monthIndex(today);
+    calNext.disabled = monthIndex(view) >= monthIndex(horizon);
+    calGrid.innerHTML = '';
+    DOWS.forEach(function (d) { calGrid.appendChild(el('div', 'dow', d)); });
+    var first = new Date(view.getFullYear(), view.getMonth(), 1);
+    for (var i = 0; i < first.getDay(); i++) { calGrid.appendChild(el('div')); }
+    var days = new Date(view.getFullYear(), view.getMonth() + 1, 0).getDate();
+    for (var dd = 1; dd <= days; dd++) {
+      (function (dd) {
+        var dt = new Date(view.getFullYear(), view.getMonth(), dd);
+        var b = el('button', 'day', String(dd)); b.type = 'button';
+        var closed = HOURS[dt.getDay()] === null || (Object.keys(HOURS).length && HOURS[dt.getDay()] === undefined);
+        b.disabled = closed || dt < today || dt > horizon;
+        if (sameDay(dt, state.date)) { b.classList.add('sel'); }
+        b.addEventListener('click', function () { state.date = dt; state.slot = null; to3.disabled = true; renderCal(); loadSlots(); });
+        calGrid.appendChild(b);
+      })(dd);
+    }
+  }
+  calPrev.addEventListener('click', function () { view = new Date(view.getFullYear(), view.getMonth() - 1, 1); renderCal(); });
+  calNext.addEventListener('click', function () { view = new Date(view.getFullYear(), view.getMonth() + 1, 1); renderCal(); });
+
+  /* step 2: real openings */
+  var slotsEl = $('slots'), slotsTitle = $('slotsTitle');
+  function fmtDate(d) { return d.toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric' }); }
+  var slotReq = 0;
+  function loadSlots() {
+    if (!state.date) { return; }
+    var mine = ++slotReq;
+    slotsTitle.textContent = fmtDate(state.date);
+    slotsEl.innerHTML = '<p class="empty">Checking openings…</p>';
+    var day = ymd(state.date);
+    salonRow().then(function (s) {
+      return rpc('sv_slots', { p_salon_id: s.id, p_from: day, p_to: day, p_service_ids: state.services.map(function (x) { return x.id; }), p_stylist_id: state.stylist ? state.stylist.id : null });
+    }).then(function (slots) {
+      if (mine !== slotReq) { return; }
+      slotsEl.innerHTML = '';
+      slots = (slots || []).filter(function (sl) { return new Date(sl.starts_at) > new Date(); });
+      if (!slots.length) { slotsEl.innerHTML = '<p class="empty">No openings that day' + (state.stylist ? ' with ' + esc(state.stylist.name.split(' ')[0]) : '') + ' — try another date.</p>'; return; }
+      /* one button per time; "first available" shows who it's with */
+      var seen = {};
+      slots.forEach(function (sl) {
+        var label = clockTz(sl.starts_at, tz);
+        var key = state.stylist ? label : label + '|' + sl.stylist_id;
+        if (seen[key]) { return; } seen[key] = true;
+        var b = el('button', null, esc(label) + (state.stylist ? '' : '<small>' + esc(String(sl.stylist_name || '').split(' ')[0]) + '</small>')); b.type = 'button';
+        b.addEventListener('click', function () {
+          state.slot = sl;
+          slotsEl.querySelectorAll('button').forEach(function (x) { x.classList.remove('sel'); });
+          b.classList.add('sel'); to3.disabled = false;
+        });
+        slotsEl.appendChild(b);
+      });
+    }).catch(function (e) {
+      if (mine !== slotReq) { return; }
+      slotsEl.innerHTML = '<p class="empty">Could not load openings (' + esc(e.message) + '). Please try again.</p>';
+    });
+  }
+
+  to3.addEventListener('click', function () {
+    if (!state.date || !state.slot) { return; }
+    var who = state.stylist ? state.stylist.name : (state.slot.stylist_name || 'First available');
+    $('sumBar').innerHTML =
+      '<div><b>Service' + (state.services.length > 1 ? 's' : '') + '</b>' + state.services.map(function (s) { return esc(s.name); }).join(', ') + '</div>' +
+      '<div><b>Date</b>' + esc(dateInTz(state.slot.starts_at, tz)) + '</div>' +
+      '<div><b>Time</b>' + esc(clockTz(state.slot.starts_at, tz)) + '</div>' +
+      '<div><b>With</b>' + esc(who) + '</div>';
+    goStep(3);
+  });
+
+  /* step 3: book it */
+  var submitBtn = $('submitBtn'), formErr = $('formErr');
+  function val(id) { return $(id).value.trim(); }
+  submitBtn.addEventListener('click', function () {
+    var name = val('f-name'), phone = val('f-phone'), email = val('f-email');
+    $('f-name').classList.toggle('errf', !name);
+    var reachBad = !phone && !email;
+    $('f-phone').classList.toggle('errf', reachBad); $('f-email').classList.toggle('errf', reachBad);
+    formErr.textContent = 'Please add your name and a phone number or email so we can confirm your appointment.';
+    formErr.style.display = (!name || reachBad) ? 'block' : 'none';
+    if (!name || reachBad) { return; }
+    if (!state.slot) { goStep(2); return; }
+    submitBtn.textContent = 'Booking…'; submitBtn.disabled = true;
+    salonRow().then(function (s) {
+      return rpc('sv_book', {
+        p_salon_id: s.id, p_stylist_id: state.slot.stylist_id, p_service_ids: state.services.map(function (x) { return x.id; }),
+        p_starts_at: state.slot.starts_at, p_client_name: name, p_client_email: email || null, p_client_phone: phone || null, p_client_note: val('f-notes') || null
+      }, 15000);
+    }).then(function (rows) {
+      var bk = rows && rows[0];
+      if (!bk) { throw new Error('no booking returned'); }
+      var confirmed = String(bk.status) === 'confirmed';
+      var who = state.stylist ? state.stylist.name : (state.slot.stylist_name || 'your stylist');
+      $('cHead').innerHTML = confirmed ? 'You\'re booked in, <span>' + esc(name.split(' ')[0]) + '</span>.' : 'Request sent, <span>' + esc(name.split(' ')[0]) + '</span>.';
+      $('cSummary').textContent = state.services.map(function (x) { return x.name; }).join(' + ') + ' · ' + dateInTz(state.slot.starts_at, tz) + ' · ' + clockTz(state.slot.starts_at, tz) + ' · with ' + who.split(' ')[0];
+      $('cText').textContent = confirmed
+        ? (email ? 'A confirmation is on its way to ' + email + '.' : 'Your appointment is confirmed.') + ' We\'ll send a reminder the day before.'
+        : who.split(' ')[0] + ' confirms each request personally — you\'ll hear back' + (email ? ' at ' + email : '') + ' shortly.';
+      $('cRef').textContent = 'Reference  ' + String(bk.id || '').replace(/-/g, '').slice(0, 6).toUpperCase();
+      $('cFoot').textContent = 'Need to change anything? ' + (SITE.phone ? 'Call us at ' + SITE.phone + '.' : 'Reply to your confirmation email.');
+      goStep(4);
+      $('book').scrollIntoView({ behavior: 'smooth' });
+    }).catch(function (err) {
+      var taken = /taken|overlap|conflict|available|exclusion/i.test(err.message);
+      formErr.textContent = taken ? 'That time was just taken — please go back and pick another.' : 'That didn\'t go through (' + err.message + '). Please try again in a moment.';
+      formErr.style.display = 'block';
+      if (taken) { state.slot = null; to3.disabled = true; loadSlots(); }
+    }).finally(function () { submitBtn.textContent = 'Confirm Booking'; submitBtn.disabled = false; });
+  });
 }
 
-function showNotFound() {
-  document.getElementById('loading').style.display = 'none';
-  document.getElementById('notFound').style.display = 'flex';
+/* ============================================================
+   LOAD
+   ============================================================ */
+function showNotFound(title, text) {
+  if (title) { $('nfTitle').textContent = title; }
+  if (text) { $('nfText').textContent = text; }
+  $('loading').classList.add('gone');
+  $('notfound').classList.add('show');
 }
-
-/* ---------------- load ---------------- */
 (function load() {
   var slug = currentSlug();
   if (!slug) { showNotFound(); return; }
-  /* Both at once. The extras call resolves to {} on any failure so a hiccup
-     there can never blank a salon's page. */
-  var main = svHardDeadline(svLoadSite(slug), 12000, 'salon lookup');
-  /* The extras are a nice-to-have. When they are slow the page goes without
-     them rather than making a client stare at a spinner for nine seconds. */
-  var side = svSoftDeadline(
-    fetch(SV_EXTRA + '?slug=' + encodeURIComponent(slug))
-      .then(function (res) { return res.ok ? res.json() : null; })
-      .then(function (j) { return (j && j.extra) || {}; })
-      .catch(function () { return {}; }),
-    2500, {});
-
-  Promise.all([main, side])
-    .then(function (r) {
-      var cfg = r[0];
-      if (cfg && cfg.ok && cfg.name) { render(cfg, r[1]); }
-      else { showNotFound(); }
-    })
-    .catch(function () {
-      /* network/error — treat as not found but keep the invite friendly */
-      showNotFound();
-    });
-})();
-
-/* ---------------- booking-request form ---------------- */
-function validEmail(v) { return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(v); }
-
-document.getElementById('leadForm').addEventListener('submit', function (e) {
-  e.preventDefault();
-  var name = document.getElementById('leadName').value.trim();
-  var phone = document.getElementById('leadPhone').value.trim();
-  var email = document.getElementById('leadEmail').value.trim();
-  var message = document.getElementById('leadMessage').value.trim();
-  var svcPick = document.getElementById('leadService').value;
-  var service = svcPick === '__other' ? '' : svcPick;
-  var stylist = document.getElementById('leadStylist').value;
-  var dateVal = document.getElementById('leadDate').value;
-  var timeVal = document.getElementById('leadTime').value;
-
-  /* One human-readable string for the portal list, plus the raw parts so a
-     real calendar can use them later without re-parsing English. */
-  var when = '';
-  if (dateVal) {
-    var dp = dateVal.split('-');
-    var dObj = new Date(Number(dp[0]), Number(dp[1]) - 1, Number(dp[2]));
-    when = dObj.toLocaleDateString(undefined, { weekday: 'short', month: 'short', day: 'numeric' });
-    if (timeVal) { when += ' at ' + timeVal; }
-  } else if (timeVal) {
-    when = 'Any day at ' + timeVal;
-  }
-
-  var nameBad = !name;
-  var reachBad = !phone && !validEmail(email);
-  document.getElementById('lfName').classList.toggle('invalid', nameBad);
-  document.getElementById('lfEmail').classList.toggle('invalid', reachBad);
-  if (nameBad || reachBad) { return; }
-
-  /* Salons on Supabase: a real booking against the stylist's calendar. Returns
-     false when it cannot (no service or no real time picked) so the old
-     request path below still runs and nothing dead-ends. */
-  if (svBookSupabase({ name: name, phone: phone, email: email, message: message, service: service, stylist: stylist, date: dateVal, time: timeVal })) { return; }
-
-  var btn = document.getElementById('leadBtn');
-  var msg = document.getElementById('leadMsg');
-  btn.disabled = true;
-  btn.textContent = 'Sending…';
-  msg.style.display = 'none';
-  msg.className = '';
-
-  /* booking request goes through the salonvine-app proxy (token added server-side) */
-  fetch(SV_LEAD_PROXY, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({
-      slug: (SITE && SITE.slug) || currentSlug(),
-      name: name,
-      phone: phone,
-      email: email,
-      message: message,
-      service: service,
-      stylist: stylist,
-      when: when,
-      date: dateVal,
-      time: timeVal
-    })
-  }).then(function (res) {
-    if (!res.ok) { throw new Error('HTTP ' + res.status); }
-    return res.json();
-  }).then(function (data) {
-    if (data && data.ok) {
-      msg.className = 'ok';
-      msg.textContent = ((SITE && SITE.name) || 'The salon') + ' will get back to you shortly — thanks!';
-      msg.style.display = 'block';
-      btn.textContent = 'Request sent ✓';
-      document.getElementById('leadForm').reset();
-
-      /* If this salon asks for a deposit, hand off to Stripe. The request is
-         already saved either way — a deposit hiccup must never lose a booking. */
-      if (data.bookingId) {
-        btn.textContent = 'Checking deposit…';
-        fetch(SV_DEPOSIT, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ slug: (SITE && SITE.slug) || currentSlug(), bookingId: data.bookingId })
-        }).then(function (r) { return r.json(); }).then(function (d) {
-          if (d && d.ok && d.depositRequired && d.url) {
-            msg.textContent = 'One more step — hold your spot with a $' +
-              (d.amountCents / 100).toFixed(2) + ' deposit. Taking you to checkout…';
-            window.location.href = d.url;
-          } else {
-            btn.textContent = 'Request sent ✓';
-          }
-        }).catch(function () { btn.textContent = 'Request sent ✓'; });
-      }
-    } else {
-      throw new Error((data && data.error) || 'Unexpected response');
-    }
-  }).catch(function (err) {
-    /* SURFACED error — never silently lose a booking request */
-    msg.className = 'err';
-    msg.textContent = 'That didn’t go through (' + err.message + '). Please try again in a moment.';
-    msg.style.display = 'block';
-    btn.disabled = false;
-    btn.textContent = 'Send request';
-  });
-});
-
-/* ---- returning from Stripe Checkout after paying a deposit ----
-   Confirmation is server-verified (we ask Stripe), never trusted from
-   these query params — they are only a hint that we should go look. */
-(function () {
-  var q = new URLSearchParams(location.search);
-  var state = q.get('deposit');
-  if (!state) { return; }
-  var msg = document.getElementById('leadMsg');
-  if (!msg) { return; }
-  function clean() {
-    history.replaceState({}, '', location.pathname);
-  }
-  if (state === 'cancelled') {
-    msg.className = 'err';
-    msg.textContent = 'Deposit not completed, so your spot is not held yet. Your request was still sent — the salon may follow up.';
-    msg.style.display = 'block';
-    clean();
-    return;
-  }
-  if (state !== 'paid') { return; }
-  var bookingId = q.get('b'), cs = q.get('cs');
-  msg.className = 'ok';
-  msg.textContent = 'Confirming your deposit…';
-  msg.style.display = 'block';
-  if (!bookingId || !cs) { clean(); return; }
-  fetch(SV_DEPOSIT_CONFIRM + '?slug=' + encodeURIComponent((SITE && SITE.slug) || currentSlug()) +
-        '&bookingId=' + encodeURIComponent(bookingId) + '&session_id=' + encodeURIComponent(cs))
-    .then(function (r) { return r.json(); })
-    .then(function (d) {
-      if (d && d.ok && d.paid) {
-        msg.className = 'ok';
-        msg.textContent = 'Deposit received — your spot is held. See you soon!';
-      } else {
-        msg.className = 'err';
-        msg.textContent = 'We could not confirm that payment yet. If you were charged, the salon will see it — no need to pay twice.';
-      }
-      msg.style.display = 'block';
-      clean();
-    })
-    .catch(function () {
-      msg.className = 'err';
-      msg.textContent = 'We could not confirm that payment yet. If you were charged, the salon will see it — no need to pay twice.';
-      clean();
-    });
-})();
-
-/* ---------------- Real bookings on Supabase ---------------- */
-/* For salons on Supabase the form stops being a note to the owner and becomes
-   a real booking: the time list shows actual openings from the stylists'
-   calendars, and sending creates the appointment — confirmed on the spot or
-   held as a request, whichever that stylist chose in her portal. The
-   database refuses a double booking, so two clients can never take one slot.
-   Anything this path cannot handle (no service picked, no date) still goes
-   the old way, so there is no dead end. */
-var SV_SB_SALON = null;   /* { id, timezone } once looked up */
-
-function svSbHeaders() {
-  return { 'apikey': SV_SUPABASE_KEY, 'Authorization': 'Bearer ' + SV_SUPABASE_KEY, 'Content-Type': 'application/json' };
-}
-function svSbMessage(text, status) {
-  try { var j = JSON.parse(text); return j.message || j.hint || ('HTTP ' + status); } catch (e) { return 'HTTP ' + status; }
-}
-function svSbRpc(name, args) {
-  return svHardDeadline(
-    fetch(SV_SUPABASE_URL + '/rest/v1/rpc/' + name, { method: 'POST', headers: svSbHeaders(), body: JSON.stringify(args) })
-      .then(function (res) {
-        return res.text().then(function (t) {
-          if (!res.ok) { throw new Error(svSbMessage(t, res.status)); }
-          return t ? JSON.parse(t) : null;
-        });
-      }),
-    8000, name);
-}
-function svSalonId() {
-  if (SV_SB_SALON) { return Promise.resolve(SV_SB_SALON); }
-  var slug = (SITE && SITE._sb && SITE._sb.slug) || svCanonicalSlug(currentSlug());
-  return svHardDeadline(
-    fetch(SV_SUPABASE_URL + '/rest/v1/salon?select=id,timezone&slug=eq.' + encodeURIComponent(slug), { headers: svSbHeaders() })
-      .then(function (r) { return r.json(); }),
-    8000, 'salon lookup'
-  ).then(function (rows) {
-    if (!rows || !rows[0]) { throw new Error('salon not found'); }
-    SV_SB_SALON = rows[0];
-    return SV_SB_SALON;
-  });
-}
-function svPick(list, name) {
-  for (var i = 0; i < list.length; i++) { if (list[i].name === name) { return list[i]; } }
-  return null;
-}
-function svClockTz(iso, tz) {
-  try {
-    return new Date(iso).toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit', timeZone: tz }).toLowerCase().replace(' ', '');
-  } catch (e) { return new Date(iso).toLocaleTimeString(); }
-}
-
-/* Fill the time list with real openings for the chosen day, service and stylist. */
-function svFillSlots() {
-  if (!(SITE && SITE._sb)) { return; }
-  var dateVal = document.getElementById('leadDate').value;
-  var svc = svPick(SITE._sb.services, document.getElementById('leadService').value);
-  var sty = svPick(SITE._sb.team, document.getElementById('leadStylist').value);
-  var timeSel = document.getElementById('leadTime');
-  if (!dateVal) { timeSel.innerHTML = '<option value="">Pick a date first</option>'; return; }
-  if (!svc) { timeSel.innerHTML = '<option value="">Pick a service first</option>'; return; }
-  timeSel.disabled = true;
-  timeSel.innerHTML = '<option value="">Checking openings…</option>';
-  svSalonId().then(function (s) {
-    return svSbRpc('sv_slots', { p_salon_id: s.id, p_from: dateVal, p_to: dateVal, p_service_ids: [svc.id], p_stylist_id: sty ? sty.id : null });
-  }).then(function (slots) {
-    timeSel.disabled = false;
-    if (!slots || !slots.length) {
-      timeSel.innerHTML = '<option value="">No openings that day — try another date</option>';
-      return;
-    }
-    timeSel.innerHTML = '<option value="">Pick a time</option>' + slots.map(function (sl) {
-      var label = svClockTz(sl.starts_at, SITE._sb.timezone) + (sty ? '' : ' with ' + sl.stylist_name);
-      return '<option value="' + esc(sl.starts_at + '|' + sl.stylist_id) + '">' + esc(label) + '</option>';
-    }).join('');
+  deadline(rpc('sv_site', { p_slug: slug }, 12000), 12000, 'sv_site').then(function (d) {
+    if (!d || !d.name) { showNotFound(); return; }
+    var st = String(d.status || '').toLowerCase();
+    if (st === 'suspended' || st === 'cancelled') { showNotFound('This salon\'s site is paused', 'The salon is not taking online bookings right now. Please check back soon.'); return; }
+    build(d);
+    $('page').hidden = false;
+    $('loading').classList.add('gone');
   }).catch(function (e) {
-    timeSel.disabled = false;
-    timeSel.innerHTML = '<option value="">Could not load openings — ' + esc(e.message) + '</option>';
+    if (window.console) { console.error('site load failed', e); }
+    showNotFound('We couldn\'t load this salon right now', 'Please refresh in a moment. If it keeps happening, the salon can reach Salon Vine support.');
   });
-}
-['leadDate', 'leadService', 'leadStylist'].forEach(function (id) {
-  document.getElementById(id).addEventListener('change', svFillSlots);
-});
-
-/* After the page renders a Supabase salon, the form speaks like a booking form. */
-var svRenderBase = render;
-render = function (cfg, extra) {
-  svRenderBase(cfg, extra);
-  if (!(cfg && cfg._sb)) { return; }
-  document.getElementById('leadTime').innerHTML = '<option value="">Pick a date first</option>';
-  document.getElementById('leadBtn').textContent = 'Book';
-  var hint = document.querySelector('#leadForm .hint');
-  if (hint) { hint.textContent = 'The times shown are real openings from the stylists\u2019 calendars.'; }
-};
-
-/* Returns true if it handled the booking, false to let the old path run. */
-function svBookSupabase(f) {
-  if (!(SITE && SITE._sb)) { return false; }
-  var svc = svPick(SITE._sb.services, f.service);
-  var parts = String(f.time || '').split('|');
-  if (!svc || !f.date || parts.length !== 2) { return false; }
-  var btn = document.getElementById('leadBtn');
-  var msg = document.getElementById('leadMsg');
-  btn.disabled = true;
-  btn.textContent = 'Booking…';
-  msg.style.display = 'none';
-  msg.className = '';
-  svSalonId().then(function (s) {
-    return svSbRpc('sv_book', {
-      p_salon_id: s.id, p_stylist_id: parts[1], p_service_ids: [svc.id], p_starts_at: parts[0],
-      p_client_name: f.name, p_client_email: f.email || null, p_client_phone: f.phone || null, p_client_note: f.message || null
-    });
-  }).then(function (rows) {
-    var bk = rows && rows[0];
-    if (!bk) { throw new Error('no booking returned'); }
-    var confirmed = String(bk.status) === 'confirmed';
-    msg.className = 'ok';
-    msg.textContent = confirmed
-      ? 'You\u2019re booked!' + (f.email ? ' A confirmation is on its way to ' + f.email + '.' : '')
-      : 'Request sent \u2014 ' + ((SITE && SITE.name) || 'the salon') + ' will confirm shortly' + (f.email ? ' by email.' : '.');
-    msg.style.display = 'block';
-    btn.textContent = confirmed ? 'Booked \u2713' : 'Request sent \u2713';
-    document.getElementById('leadForm').reset();
-    document.getElementById('leadTime').innerHTML = '<option value="">Pick a date first</option>';
-  }).catch(function (err) {
-    var taken = /taken|overlap|conflict|available|exclusion/i.test(err.message);
-    msg.className = 'err';
-    msg.textContent = taken
-      ? 'That time was just taken \u2014 please pick another.'
-      : 'That didn\u2019t go through (' + err.message + '). Please try again in a moment.';
-    msg.style.display = 'block';
-    btn.disabled = false;
-    btn.textContent = 'Book';
-    svFillSlots();
-  });
-  return true;
-}
-
+})();
 </script>
-
 </body>
 </html>
