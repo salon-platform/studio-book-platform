@@ -933,7 +933,7 @@ function setupBooking(services, tz) {
       var seen = {};
       slots.forEach(function (sl) {
         var label = clockTz(sl.starts_at, tz);
-        var key = state.stylist ? label : label + '|' + sl.stylist_id;
+        var key = label;   /* one button per time; first available shows who it's with */
         if (seen[key]) { return; } seen[key] = true;
         var b = el('button', null, esc(label) + (state.stylist ? '' : '<small>' + esc(String(sl.stylist_name || '').split(' ')[0]) + '</small>')); b.type = 'button';
         b.addEventListener('click', function () {
