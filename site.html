@@ -629,14 +629,51 @@ function build(d) {
   (d.hours || []).forEach(function (h) { HOURS[Number(h.weekday)] = h.closed ? null : { opens: h.opens, closes: h.closes }; });
   services.forEach(function (s) { var c = (s.category || '').trim() || 'Services'; (MENU[c] = MENU[c] || []).push(s); });
 
-  /* ---- title / meta / schema ---- */
+  /* ---- title / meta / schema / canonical / social (SEO) ---- */
   var cityText = d.city || '';
   document.title = d.name + (d.tagline ? ' — ' + d.tagline : '') + (cityText ? ' | ' + cityText : '');
-  document.querySelector('meta[name="description"]').setAttribute('content', (d.about || (d.name + ' — book online.')).slice(0, 160));
+  var metaDesc = (d.about || (d.name + (cityText ? ' in ' + cityText : '') + ' — book online.')).replace(/\s+/g, ' ').trim().slice(0, 160);
+  document.querySelector('meta[name="description"]').setAttribute('content', metaDesc);
+
+  /* One canonical URL per salon (the salon's own subdomain), so the same salon
+     served at /s/<slug>, ?s=<slug> and <name>.salonvine.com is not treated as
+     three duplicate pages by search engines. */
+  var canonical = 'https://' + String(d.slug || currentSlug()).replace(/-/g, '') + '.salonvine.com/';
+  var ogImage = d.heroImage || d.logo || (STOCK_BASE + 'stock-hero-bright.jpg');
+
+  function setMetaTag(attr, key, val) {
+    if (!val) { return; }
+    var el = document.head.querySelector('[' + attr + '="' + key + '"]');
+    if (!el) { el = document.createElement('meta'); el.setAttribute(attr, key); document.head.appendChild(el); }
+    el.setAttribute('content', val);
+  }
+  var canEl = document.head.querySelector('link[rel="canonical"]');
+  if (!canEl) { canEl = document.createElement('link'); canEl.setAttribute('rel', 'canonical'); document.head.appendChild(canEl); }
+  canEl.setAttribute('href', canonical);
+
+  setMetaTag('property', 'og:type', 'website');
+  setMetaTag('property', 'og:title', document.title);
+  setMetaTag('property', 'og:description', metaDesc);
+  setMetaTag('property', 'og:url', canonical);
+  setMetaTag('property', 'og:image', ogImage);
+  setMetaTag('property', 'og:site_name', d.name);
+  setMetaTag('name', 'twitter:card', 'summary_large_image');
+  setMetaTag('name', 'twitter:title', document.title);
+  setMetaTag('name', 'twitter:description', metaDesc);
+  setMetaTag('name', 'twitter:image', ogImage);
+
   try {
-    var ld = { '@context': 'https://schema.org', '@type': 'HairSalon', 'name': d.name, 'url': location.href.split('#')[0] };
+    var ld = { '@context': 'https://schema.org', '@type': 'HairSalon', 'name': d.name, 'url': canonical };
+    if (metaDesc) { ld.description = metaDesc; }
+    if (ogImage) { ld.image = ogImage; }
     if (d.phone) { ld.telephone = d.phone; }
     if (d.address) { ld.address = d.address; }
+    if (cityText) { ld.areaServed = cityText; }
+    ld.priceRange = '$$';
+    var DOW = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
+    var oh = (d.hours || []).filter(function (h) { return h && !h.closed && h.opens && h.closes; })
+      .map(function (h) { return { '@type': 'OpeningHoursSpecification', 'dayOfWeek': DOW[Number(h.weekday)], 'opens': h.opens, 'closes': h.closes }; });
+    if (oh.length) { ld.openingHoursSpecification = oh; }
     var same = [d.instagram ? 'https://www.instagram.com/' + d.instagram + '/' : null, d.facebook].filter(Boolean);
     if (same.length) { ld.sameAs = same; }
     var sc = document.createElement('script'); sc.type = 'application/ld+json'; sc.textContent = JSON.stringify(ld); document.head.appendChild(sc);
