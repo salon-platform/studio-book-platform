@@ -60,7 +60,7 @@
       </form>
       <div class="login-msg" id="staffMsg"></div>
       <p style="text-align:center;font-size:.82rem;color:var(--ink-soft);margin-top:16px">
-        Forgot your password? <a id="forgotLink" href="#" style="text-decoration:underline">Reset it from your salon portal</a>.
+        Forgot your password? <a id="forgotLink" href="#" style="text-decoration:underline">Email me a reset link</a>.
       </p>
     </div>
 
@@ -117,15 +117,35 @@ function deriveSlug(raw) {
     .slice(0, 60);
 }
 
-/* keep the forgot-password link pointed at the right portal as they type */
+/* forgot password: send the reset email from right here, using the salon
+   and email already typed above (the server matches "Studio 17",
+   "studio-17" and "Studio 17 Salon" to the same salon). */
 var slugInput = document.getElementById('staffSlug');
-function syncForgotLink() {
+document.getElementById('forgotLink').addEventListener('click', function (e) {
+  e.preventDefault();
+  var msg = document.getElementById('staffMsg');
   var slug = deriveSlug(slugInput.value);
-  document.getElementById('forgotLink').href =
-    slug ? SV_APP + '/p/' + encodeURIComponent(slug) : SV_APP;
-}
-slugInput.addEventListener('input', syncForgotLink);
-syncForgotLink();
+  var email = document.getElementById('staffEmail').value.trim();
+  msg.className = 'login-msg';
+  if (!slug || !email) {
+    msg.classList.add('err');
+    msg.textContent = 'Type your salon name and email above first, then tap the reset link.';
+    msg.style.display = 'block';
+    return;
+  }
+  msg.textContent = 'Sending…';
+  msg.style.display = 'block';
+  fetch(SV_APP + '/.netlify/functions/forgot-password', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ slug: slug, email: email })
+  }).then(function () {
+    msg.textContent = 'If that account exists, a reset link is on its way to ' + email + '. It works for 1 hour.';
+  }).catch(function () {
+    msg.classList.add('err');
+    msg.textContent = 'Could not send the reset email right now — please try again in a moment.';
+  });
+});
 
 document.getElementById('staffForm').addEventListener('submit', function (e) {
   e.preventDefault();
