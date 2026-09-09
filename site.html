@@ -1094,7 +1094,7 @@ function setupBooking(services, tz) {
       $('cText').textContent = confirmed
         ? (email ? 'A confirmation is on its way to ' + email + '.' : 'Your appointment is confirmed.') + ' We\'ll send a reminder the day before.'
         : who.split(' ')[0] + ' confirms each request personally — you\'ll hear back' + (email ? ' at ' + email : '') + ' shortly.';
-      $('cRef').textContent = 'Reference  ' + String(bk.id || '').replace(/-/g, '').slice(0, 6).toUpperCase();
+      $('cRef').textContent = 'Reference  ' + String(bk.appointment_id || bk.id || '').replace(/-/g, '').slice(0, 6).toUpperCase();
       /* where to go — show the salon address with a one-tap map link */
       var cw = $('cWhere');
       if (SITE.address) {
