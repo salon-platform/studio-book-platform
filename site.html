@@ -250,6 +250,9 @@
   .confirmed p{color:var(--ink-soft);max-width:46ch;margin:0 auto 10px}
   .confirmed .ref{display:inline-block;margin:18px auto 6px;padding:10px 26px;border:1px dashed var(--bronze);font-size:.9rem;letter-spacing:.2em;color:var(--bronze-dark)}
   .confirmed .sumline{margin-top:16px;font-family:'Cormorant Garamond',serif;font-size:1.35rem;color:var(--ink)}
+  .confirmed .cWhere{font-size:.92rem;margin-top:4px}
+  .confirmed .cWhere .cwlabel{font-size:.68rem;letter-spacing:.2em;text-transform:uppercase;color:var(--bronze)}
+  .confirmed .cWhere a,.confirmed #cFoot a{color:var(--bronze-dark);text-decoration:underline;text-underline-offset:2px}
   .book-fine{text-align:center;font-size:.82rem;color:var(--ink-soft);margin-top:28px;font-style:italic}
 
   .locations{background:var(--ink);color:var(--cream)}
@@ -460,6 +463,7 @@
             <h3 id="cHead">You're booked in, <span id="cName"></span>.</h3>
             <p class="sumline" id="cSummary"></p>
             <p id="cText"></p>
+            <p class="cWhere" id="cWhere" hidden></p>
             <div class="ref" id="cRef"></div>
             <p style="font-size:.85rem" id="cFoot"></p>
           </div>
@@ -791,6 +795,7 @@ function build(d) {
   var links = [];
   if (d.address) { links.push(['Directions', 'https://maps.google.com/?q=' + encodeURIComponent(d.address)]); }
   if (d.phone) { links.push([d.phone, 'tel:' + String(d.phone).replace(/[^\d+]/g, '')]); }
+  if (d.phone) { links.push(['Text us', 'sms:' + String(d.phone).replace(/[^\d+]/g, '')]); }
   if (d.instagram) { links.push(['Instagram', 'https://www.instagram.com/' + d.instagram + '/']); }
   var card = el('div', 'loc');
   card.innerHTML = '<p class="city">' + esc(cityText || 'Our salon') + '</p><h3>' + esc(d.name) + '</h3>' +
@@ -1090,7 +1095,17 @@ function setupBooking(services, tz) {
         ? (email ? 'A confirmation is on its way to ' + email + '.' : 'Your appointment is confirmed.') + ' We\'ll send a reminder the day before.'
         : who.split(' ')[0] + ' confirms each request personally — you\'ll hear back' + (email ? ' at ' + email : '') + ' shortly.';
       $('cRef').textContent = 'Reference  ' + String(bk.id || '').replace(/-/g, '').slice(0, 6).toUpperCase();
-      $('cFoot').textContent = 'Need to change anything? ' + (SITE.phone ? 'Call us at ' + SITE.phone + '.' : 'Reply to your confirmation email.');
+      /* where to go — show the salon address with a one-tap map link */
+      var cw = $('cWhere');
+      if (SITE.address) {
+        cw.innerHTML = '<span class="cwlabel">Where</span> ' + esc(SITE.address) +
+          ' · <a href="https://maps.google.com/?q=' + encodeURIComponent(SITE.address) + '" target="_blank" rel="noopener">Get directions ↗</a>';
+        cw.hidden = false;
+      } else { cw.hidden = true; }
+      var telNum = SITE.phone ? String(SITE.phone).replace(/[^\d+]/g, '') : '';
+      $('cFoot').innerHTML = SITE.phone
+        ? 'Need to change anything? <a href="tel:' + telNum + '">Call</a> or <a href="sms:' + telNum + '">text us</a> at ' + esc(SITE.phone) + '.'
+        : 'Need to change anything? Reply to your confirmation email.';
       goStep(4);
       $('book').scrollIntoView({ behavior: 'smooth' });
     }).catch(function (err) {
