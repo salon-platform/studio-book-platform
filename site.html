@@ -721,7 +721,7 @@ function build(d) {
 
   /* ---- hero ---- */
   $('heroEyebrow').textContent = d.tagline || 'Welcome';
-  $('heroTitle').innerHTML = d.heroTitle ? String(d.heroTitle).replace(/<(?!\/?em>)[^>]*>/g, '') : 'Beauty, crafted with <em>intention</em>.';
+  $('heroTitle').innerHTML = d.heroTitle ? String(d.heroTitle).replace(/<(?!\/?em>)[^>]*>/g, '') : ('Welcome to ' + esc(d.name || 'our salon'));
   $('heroSub').textContent = d.about || ('Welcome to ' + d.name + '. Book your next appointment online in under a minute.');
   $('heroCities').innerHTML = cityText ? '<b>' + esc(cityText) + '</b>' : '';
   var photos = (d.photos || []).filter(Boolean);
