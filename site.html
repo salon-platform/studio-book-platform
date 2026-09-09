@@ -872,7 +872,8 @@ function setupBooking(services, tz) {
     if (!PRODUCTS.length) { wrap.hidden = true; return; }
     wrap.hidden = false;
     grid.innerHTML = '';
-    PRODUCTS.forEach(function (p) {
+    /* A checkout upsell stays short — show a handful, keep the rest out of the way. */
+    PRODUCTS.slice(0, 6).forEach(function (p) {
       var sel = state.products.some(function (x) { return x.id === p.id; });
       var card = el('button', 'addon' + (sel ? ' sel' : ''));
       card.type = 'button';
