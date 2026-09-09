@@ -940,8 +940,12 @@ function setupBooking(services, tz) {
   function renderTabs() {
     bookTabs.innerHTML = '';
     var visible = cats.filter(function (c) { return MENU[c].some(offered); });
+    /* Keep the active category to one this stylist actually offers — even when
+       there's only one (tabs stay hidden). Otherwise, for a stylist who works
+       in a single category that isn't the menu's first, the card filter below
+       matches state.cat against a category they don't work in and shows nothing. */
+    if (visible.length && visible.indexOf(state.cat) === -1) { state.cat = visible[0]; }
     if (visible.length < 2) { return; }
-    if (visible.indexOf(state.cat) === -1) { state.cat = visible[0]; }
     visible.forEach(function (c) {
       var b = el('button', c === state.cat ? 'sel' : '', esc(c)); b.type = 'button';
       b.addEventListener('click', function () { state.cat = c; renderCards(); });
