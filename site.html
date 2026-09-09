@@ -1106,8 +1106,22 @@ function setupBooking(services, tz) {
       $('cFoot').innerHTML = SITE.phone
         ? 'Need to change anything? <a href="tel:' + telNum + '">Call</a> or <a href="sms:' + telNum + '">text us</a> at ' + esc(SITE.phone) + '.'
         : 'Need to change anything? Reply to your confirmation email.';
-      goStep(4);
-      $('book').scrollIntoView({ behavior: 'smooth' });
+
+      /* Deposit hand-off: the booking is already saved, so this never blocks
+         it. If this stylist/salon takes a deposit, we snapshot the confirmation
+         and send the client to Stripe; on return we restore it (see load()). */
+      var apptId = String(bk.appointment_id || bk.id || '');
+      try {
+        sessionStorage.setItem('sv_conf_' + apptId, JSON.stringify({
+          cHead: $('cHead').innerHTML, cSummary: $('cSummary').textContent,
+          cText: $('cText').textContent, cRef: $('cRef').textContent,
+          cWhere: cw.hidden ? null : cw.innerHTML, cFoot: $('cFoot').innerHTML
+        }));
+      } catch (e) {}
+      maybeDeposit(SITE.slug, apptId, name, email, function () {
+        goStep(4);
+        $('book').scrollIntoView({ behavior: 'smooth' });
+      });
     }).catch(function (err) {
       var taken = /taken|overlap|conflict|available|exclusion/i.test(err.message);
       formErr.textContent = taken ? 'That time was just taken — please go back and pick another.' : 'That didn\'t go through (' + err.message + '). Please try again in a moment.';
@@ -1141,6 +1155,58 @@ function fetchProducts(slug) {
   } catch (e) { PRODUCTS = []; }
 }
 
+/* Ask the server whether this booking needs a deposit; if so, send the client
+   to Stripe. Best-effort with a hard timeout — a slow or failing deposit call
+   must never leave the client hanging: we just confirm the (already-saved)
+   booking. `done()` shows the normal confirmation. */
+function maybeDeposit(slug, apptId, name, email, done) {
+  var settled = false;
+  var finish = function () { if (settled) return; settled = true; done(); };
+  var to = setTimeout(finish, 6000);
+  try {
+    fetch(SV_API_BASE + '/booking-deposit', {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ slug: slug, bookingId: apptId, clientEmail: email, clientName: name })
+    })
+      .then(function (r) { return r.ok ? r.json() : null; })
+      .then(function (j) {
+        clearTimeout(to);
+        if (!settled && j && j.depositRequired && j.url) { settled = true; window.location.href = j.url; return; }
+        finish();
+      })
+      .catch(function () { clearTimeout(to); finish(); });
+  } catch (e) { clearTimeout(to); finish(); }
+}
+
+/* Coming back from Stripe. The appointment already exists either way; we just
+   restore the confirmation the client saw before the redirect and, if paid,
+   verify server-side (never trust the query string as proof of payment). */
+function handleDepositReturn(slug) {
+  var q = new URLSearchParams(location.search);
+  var st = q.get('deposit'); if (!st) return;
+  var apptId = q.get('b') || '', cs = q.get('cs') || '';
+  var snap = null; try { snap = JSON.parse(sessionStorage.getItem('sv_conf_' + apptId) || 'null'); } catch (e) {}
+  function showConfirmed(lead) {
+    document.querySelectorAll('.rv').forEach(function (x) { x.classList.add('in'); });
+    if (snap) {
+      $('cHead').innerHTML = snap.cHead; $('cSummary').textContent = snap.cSummary;
+      $('cText').textContent = snap.cText; $('cRef').textContent = snap.cRef;
+      if (snap.cWhere) { $('cWhere').innerHTML = snap.cWhere; $('cWhere').hidden = false; }
+      $('cFoot').innerHTML = snap.cFoot;
+    } else { $('cHead').innerHTML = 'You\'re booked in.'; }
+    if (lead) { $('cText').textContent = lead + ' ' + ($('cText').textContent || ''); }
+    document.querySelectorAll('.pane').forEach(function (p) { p.classList.remove('active'); });
+    var p4 = document.querySelector('.pane[data-pane="4"]'); if (p4) { p4.classList.add('active'); }
+    var bk = document.getElementById('book'); if (bk) { bk.scrollIntoView(); }
+  }
+  if (st === 'cancelled') { showConfirmed('Your appointment is held — you can pay the deposit later or in person.'); return; }
+  if (st === 'paid' && apptId && cs) {
+    showConfirmed('Deposit received — thank you!');
+    fetch(SV_API_BASE + '/deposit-confirm?slug=' + encodeURIComponent(slug) + '&bookingId=' + encodeURIComponent(apptId) + '&session_id=' + encodeURIComponent(cs))
+      .then(function (r) { return r.ok ? r.json() : null; }).catch(function () {});
+  }
+}
+
 (function load() {
   var slug = currentSlug();
   if (!slug) { showNotFound(); return; }
@@ -1152,6 +1218,7 @@ function fetchProducts(slug) {
     $('page').hidden = false;
     $('loading').classList.add('gone');
     fetchProducts(slug);
+    handleDepositReturn(slug);
   }).catch(function (e) {
     if (window.console) { console.error('site load failed', e); }
     showNotFound('We couldn\'t load this salon right now', 'Please refresh in a moment. If it keeps happening, the salon can reach Salon Vine support.');
