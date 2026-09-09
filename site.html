@@ -156,6 +156,25 @@
   .with-chip.on{display:flex}
   .with-chip span{display:inline-flex;align-items:center;gap:10px;font-size:.8rem;letter-spacing:.14em;text-transform:uppercase;color:var(--bronze-dark);border:1px dashed var(--bronze);padding:8px 16px}
   .with-chip button{background:none;border:none;cursor:pointer;color:var(--ink-soft);font-size:1rem;line-height:1}
+  .with-chip .wc-av{width:40px;height:40px;flex:0 0 auto;border-radius:50%;overflow:hidden;background:linear-gradient(135deg,var(--blush),var(--sand));display:none;align-items:center;justify-content:center;font-family:'Cormorant Garamond',serif;font-size:1rem;color:var(--bronze-dark);border:2px solid var(--white);box-shadow:0 0 0 1px var(--blush)}
+  .with-chip .wc-av:not(:empty){display:inline-flex}
+  .with-chip .wc-av img{width:100%;height:100%;object-fit:cover;display:block}
+  /* Checkout add-ons (take-home products) */
+  .addons{margin:0 0 30px}
+  .addons-head h4{font-size:1.15rem;margin-bottom:2px}
+  .addons-head .sub{margin:0 0 14px}
+  .addon-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(160px,1fr));gap:12px}
+  .addon{display:flex;align-items:center;gap:12px;border:1px solid var(--line);background:var(--white);padding:10px 12px;cursor:pointer;text-align:left;transition:border-color .2s,background .2s;position:relative}
+  .addon:hover{border-color:var(--bronze)}
+  .addon.sel{border-color:var(--bronze);background:var(--cream)}
+  .addon .pimg{width:46px;height:46px;flex:0 0 auto;border-radius:8px;overflow:hidden;background:linear-gradient(135deg,var(--blush),var(--sand));display:flex;align-items:center;justify-content:center;color:var(--bronze-dark);font-size:1.15rem}
+  .addon .pimg img{width:100%;height:100%;object-fit:cover;display:block}
+  .addon .pmeta{min-width:0;flex:1 1 auto}
+  .addon .pn{display:block;font-size:.9rem;line-height:1.25}
+  .addon .pp{display:block;font-size:.82rem;color:var(--bronze-dark);margin-top:2px}
+  .addon .ptick{position:absolute;top:7px;right:9px;font-size:.9rem;color:var(--bronze);opacity:0;transition:opacity .2s}
+  .addon.sel .ptick{opacity:1}
+  .addon-picked{margin-top:12px;font-size:.9rem;color:var(--ink-soft)}
   .steps{display:flex;border-bottom:1px solid var(--line)}
   .steps .st{flex:1;text-align:center;padding:18px 6px;font-size:.68rem;letter-spacing:.22em;text-transform:uppercase;color:var(--ink-soft);border-bottom:2px solid transparent;white-space:nowrap}
   .steps .st b{display:inline-flex;width:22px;height:22px;border-radius:50%;border:1px solid var(--line);align-items:center;justify-content:center;font-weight:400;margin-right:8px;font-size:.7rem}
@@ -352,7 +371,7 @@
         <p id="bookSub">Pick a service, choose a real opening from the calendar, and you're done.</p>
       </div>
       <div class="wizard rv" id="wizard">
-        <div class="with-chip" id="withChip"><span>Booking with <b id="withName" style="font-weight:400"></b> <button type="button" id="withClear" title="Remove stylist">&times;</button></span></div>
+        <div class="with-chip" id="withChip"><span><span class="wc-av" id="withAv" aria-hidden="true"></span>Booking with <b id="withName" style="font-weight:400"></b> <button type="button" id="withClear" title="Remove stylist">&times;</button></span></div>
         <div class="steps">
           <div class="st active" data-step="1"><b>1</b><span>Service</span></div>
           <div class="st" data-step="2"><b>2</b><span>Date &amp; Time</span></div>
@@ -404,6 +423,11 @@
           <h3>Almost done.</h3>
           <p class="sub">Tell us who you are and we'll take it from here.</p>
           <div class="summary" id="sumBar"></div>
+          <div class="addons" id="addons" hidden>
+            <div class="addons-head"><h4>Add a little extra</h4><p class="sub">Take home what your stylist uses — added to your visit, pay in the chair.</p></div>
+            <div class="addon-grid" id="addonGrid"></div>
+            <p class="addon-picked" id="addonPicked"></p>
+          </div>
           <div class="fields">
             <div class="field">
               <label for="f-name">Your Name</label>
@@ -498,6 +522,7 @@
 var SV_SUPABASE_URL = 'https://zdlytaswwvemnlgnonnd.supabase.co';
 var SV_SUPABASE_KEY = 'sb_publishable_RWlZ237RfOdorUJycQs2JQ_pFHiGjMX';   /* public key — safe in a browser */
 var STOCK_BASE = 'https://salonvine.com/assets/stock/';
+var SV_API_BASE = 'https://app.salonvine.com/api';   /* Netlify functions (public-products) */
 
 /* Themes (kept in sync with signup.html + the portal editor). */
 var THEMES = {
@@ -612,6 +637,7 @@ function applyTheme(themeKey, accent) {
 var SITE = null;          /* sv_site payload */
 var MENU = {};            /* category -> [service] */
 var TEAM = [];            /* stylists */
+var PRODUCTS = [];        /* retail products for checkout add-ons */
 var HOURS = {};           /* weekday -> {opens, closes} or null */
 
 function build(d) {
@@ -837,7 +863,34 @@ document.addEventListener('keydown', function (e) { if (e.key === 'Escape') { cl
    BOOKING WIZARD — real openings, real bookings
    ============================================================ */
 function setupBooking(services, tz) {
-  var state = { services: [], stylist: null, date: null, slot: null, cat: null };
+  var state = { services: [], stylist: null, date: null, slot: null, cat: null, products: [] };
+
+  /* ---- checkout add-ons (take-home products) ---- */
+  function renderAddons() {
+    var wrap = $('addons'), grid = $('addonGrid');
+    if (!wrap || !grid) { return; }
+    if (!PRODUCTS.length) { wrap.hidden = true; return; }
+    wrap.hidden = false;
+    grid.innerHTML = '';
+    PRODUCTS.forEach(function (p) {
+      var sel = state.products.some(function (x) { return x.id === p.id; });
+      var card = el('button', 'addon' + (sel ? ' sel' : ''));
+      card.type = 'button';
+      card.innerHTML = '<span class="pimg">' + (p.image ? '<img src="' + esc(p.image) + '" alt="' + esc(p.name) + '" loading="lazy">' : '✦') + '</span>' +
+        '<span class="pmeta"><span class="pn">' + esc(p.name) + '</span><span class="pp">' + esc(money(p.price)) + '</span></span>' +
+        '<span class="ptick" aria-hidden="true">✓</span>';
+      card.addEventListener('click', function () {
+        var i = state.products.findIndex(function (x) { return x.id === p.id; });
+        if (i === -1) { state.products.push(p); } else { state.products.splice(i, 1); }
+        renderAddons();
+      });
+      grid.appendChild(card);
+    });
+    $('addonPicked').textContent = state.products.length
+      ? 'Adding: ' + state.products.map(function (x) { return x.name; }).join(', ')
+      : '';
+  }
+  window._svRenderAddons = renderAddons;
   var svcWrap = $('svcCards'), to2 = $('to2'), to3 = $('to3'), bookTabs = $('bookTabs'), picked = $('picked');
   var stySel = $('f-stylist'), chip = $('withChip');
 
@@ -850,7 +903,12 @@ function setupBooking(services, tz) {
   function setStylist(st) {
     state.stylist = st || null;
     stySel.value = st ? st.id : '';
-    if (st) { $('withName').textContent = st.name; chip.classList.add('on'); } else { chip.classList.remove('on'); }
+    var av = $('withAv');
+    if (st) {
+      $('withName').textContent = st.name;
+      av.innerHTML = st.photo ? '<img src="' + esc(st.photo) + '" alt="' + esc(st.name) + '">' : esc(initials(st.name));
+      chip.classList.add('on');
+    } else { chip.classList.remove('on'); if (av) { av.innerHTML = ''; } }
     /* her menu may differ from the salon menu */
     state.services = state.services.filter(function (s) { return offered(s); });
     renderCards();
@@ -994,6 +1052,7 @@ function setupBooking(services, tz) {
       '<div><b>Date</b>' + esc(dateInTz(state.slot.starts_at, tz)) + '</div>' +
       '<div><b>Time</b>' + esc(clockTz(state.slot.starts_at, tz)) + '</div>' +
       '<div><b>With</b>' + esc(who) + '</div>';
+    renderAddons();
     goStep(3);
   });
 
@@ -1010,10 +1069,14 @@ function setupBooking(services, tz) {
     if (!name || reachBad) { return; }
     if (!state.slot) { goStep(2); return; }
     submitBtn.textContent = 'Booking…'; submitBtn.disabled = true;
+    var note = val('f-notes');
+    if (state.products.length) {
+      note = (note ? note + '\n\n' : '') + 'Take-home products: ' + state.products.map(function (x) { return x.name; }).join(', ');
+    }
     salonRow().then(function (s) {
       return rpc('sv_book', {
         p_salon_id: s.id, p_stylist_id: state.slot.stylist_id, p_service_ids: state.services.map(function (x) { return x.id; }),
-        p_starts_at: state.slot.starts_at, p_client_name: name, p_client_email: email || null, p_client_phone: phone || null, p_client_note: val('f-notes') || null
+        p_starts_at: state.slot.starts_at, p_client_name: name, p_client_email: email || null, p_client_phone: phone || null, p_client_note: note || null
       }, 15000);
     }).then(function (rows) {
       var bk = rows && rows[0];
@@ -1047,6 +1110,21 @@ function showNotFound(title, text) {
   $('loading').classList.add('gone');
   $('notfound').classList.add('show');
 }
+/* Retail products for the checkout add-on upsell. Read through a server-side
+   endpoint (the product table isn't public), best-effort — a failure just means
+   no add-ons shown, never a broken booking page. */
+function fetchProducts(slug) {
+  try {
+    fetch(SV_API_BASE + '/public-products?slug=' + encodeURIComponent(slug))
+      .then(function (r) { return r.ok ? r.json() : null; })
+      .then(function (j) {
+        PRODUCTS = (j && Array.isArray(j.products)) ? j.products.filter(function (p) { return p && p.name; }) : [];
+        if (typeof window._svRenderAddons === 'function') { window._svRenderAddons(); }
+      })
+      .catch(function () { PRODUCTS = []; });
+  } catch (e) { PRODUCTS = []; }
+}
+
 (function load() {
   var slug = currentSlug();
   if (!slug) { showNotFound(); return; }
@@ -1057,6 +1135,7 @@ function showNotFound(title, text) {
     build(d);
     $('page').hidden = false;
     $('loading').classList.add('gone');
+    fetchProducts(slug);
   }).catch(function (e) {
     if (window.console) { console.error('site load failed', e); }
     showNotFound('We couldn\'t load this salon right now', 'Please refresh in a moment. If it keeps happening, the salon can reach Salon Vine support.');
